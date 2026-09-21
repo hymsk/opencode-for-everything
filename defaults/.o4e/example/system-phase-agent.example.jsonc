@@ -1,0 +1,32 @@
+{
+  "$schema": "../schemas/system-phase-agent.schema.json",
+
+  // 系统内部阶段名称，必须是以下之一：compaction, title, summary
+  // 文件名必须与 name 一致。不能新增其他系统内部阶段。
+  "name": "compaction",
+
+  // 系统提示词文件名称，相对于最终选定的 promptDir；省略文件扩展名 .md。必填。
+  "systemPrompt": "system/compaction/system",
+
+  // 注入提示词文件列表，相对于最终选定的 promptDir。可选。
+  // "injects": ["system/compaction/inject-1"],
+
+  // 提示词目录，相对于 .o4e/ 配置根。system 阶段省略时直接继承 config.promptsDir。
+  // 例如下面的目录配合 systemPrompt，读取 .o4e/prompts/system/compaction/system.md。
+  // "promptDir": "prompts",
+
+  // 指令文件配置，覆盖 config.instructionFiles。
+  // 格式与 config.instructionFiles 相同。
+  "instructionFiles": {
+    "global": ["<default>"],
+    "project": ["<default>"]
+  },
+
+  // 允许发现的 Skill 名称。覆盖 config.loadSkills；* 表示不按名称限制，[] 表示全部拒绝。
+  // 系统内部阶段通常不需要 Skill。
+  "loadSkills": [],
+
+  // 工具白名单，覆盖 config.loadTools。
+  // [] 关闭全部受管工具。系统内部阶段通常不需要工具。
+  "loadTools": []
+}

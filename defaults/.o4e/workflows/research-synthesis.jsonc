@@ -1,0 +1,8 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "research-synthesis",
+  "description": "Gather and synthesize evidence directly.", "output": { "$from": "steps", "path": "/synthesize" },
+  "steps": [
+    { "id": "gather", "type": "work", "description": "Gather source-backed observations relevant to the question and record limitations." },
+    { "id": "synthesize", "type": "work", "dependsOn": ["gather"], "input": { "$from": "dependencies", "path": "/gather" }, "description": "Compare sources; produce conclusions and recommendations, clearly identifying unsupported inferences." }
+  ]
+}

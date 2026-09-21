@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "solution-design",
+  "description": "Design a bounded solution in the main Session.", "output": { "$from": "steps", "path": "/design" },
+  "steps": [{ "id": "design", "type": "work", "description": "Inspect current architecture and requirements. Return an implementation plan, module boundaries, alternatives, risks and test strategy without claiming implementation." }]
+}

@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "implementation-change",
+  "description": "Implement one bounded accepted change directly.",
+  "output": { "$from": "steps", "path": "/implement" },
+  "steps": [{ "id": "implement", "type": "work", "description": "Read the accepted design and task authorization. Implement only that scope, preserve unrelated changes, and report files, validation and residual risks.", "maxRepairRounds": 0 }]
+}

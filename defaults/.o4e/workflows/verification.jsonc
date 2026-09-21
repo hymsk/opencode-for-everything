@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "verification",
+  "description": "Verify a bounded change using actual command evidence.",
+  "output": { "$from": "steps", "path": "/verify" },
+  "steps": [{ "id": "verify", "type": "work", "description": "Run the required validation commands; inspect failures and report coverage limits. Attach a command-success reference from this Attempt, not a prose success claim.", "gate": { "evidence": ["command-success"] } }]
+}

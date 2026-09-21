@@ -1,0 +1,61 @@
+{
+  "$schema": "../schemas/subagent-agent.schema.json",
+
+  // agent 名称，必须全局唯一，且与文件名一致。
+  // 格式：小写字母开头，只能包含小写字母、数字、连字符。
+  "name": "my-subagent",
+
+  // agent 描述，显示在 task 调用时。单行文本。
+  "description": "我的子 agent",
+
+  // 可选 Plan Profile：self 只生成 <name> (plan)，child 保留普通子 Agent 并额外生成 Plan。
+  // 两者仍是 subagent，只能通过受管 task 委派，不进入主 Agent Selector。
+  // "plan": { "mode": "child", "loadMcp": {} },
+
+
+
+  // 内联基础提示词文本，不读取 promptsDir 文件。
+  // 与 systemPrompt 互斥。
+  // "base": "You are a focused specialist agent.",
+
+  // 系统提示词文件名称，相对于最终选定的 promptDir；省略文件扩展名 .md。
+  // 与 base 互斥。
+  "systemPrompt": "subagent/my-subagent/system",
+
+  // 注入提示词文件列表，相对于最终选定的 promptDir。
+  // 可与 systemPrompt 或 base 一起使用。
+  // "injects": ["subagent/my-subagent/inject-1", "subagent/my-subagent/inject-2"],
+
+  // 消息提示词文件名称，用于在用户消息前注入。
+  // "messagePrompt": "subagent/my-subagent/reminder",
+
+  // 提示词目录，相对于 .o4e/ 配置根。省略时使用适用的 Agent 默认值，否则继承 config.promptsDir。
+  // 例如下面的目录配合 systemPrompt，读取 .o4e/prompts/subagent/my-subagent/system.md。
+  // "promptDir": "prompts",
+
+  // 指令文件配置，覆盖 config.instructionFiles。
+  // 格式与 config.instructionFiles 相同。
+  "instructionFiles": {
+    "global": ["<default>"],
+    "project": ["<default>"]
+  },
+
+  // 允许发现的 Skill 名称。覆盖 config.loadSkills；* 表示不按名称限制，[] 表示全部拒绝。
+  "loadSkills": ["*"],
+
+  // 工具白名单，覆盖 config.loadTools。
+  // [] 关闭全部受管工具。
+  // 可选值：question, bash, read, glob, grep, edit, task, execute, webfetch, websearch, lsp, todowrite, skill
+  // 配置只接受 canonical edit；它同时控制宿主 edit、write 和 apply_patch。write 不是有效配置名。execute 是实验性 Code Mode，仅在宿主启用时出现。
+  "loadTools": ["bash", "read", "glob", "grep", "edit", "execute", "webfetch", "websearch", "lsp", "todowrite", "skill"],
+
+  // subagent 可继续委派；需同时加载 task 工具和目标 Agent，且通过宿主授权。
+  "loadAgents": [],
+
+  // MCP 工具白名单，覆盖 config.loadMcp。
+  // 键为 MCP server 名称，值为工具名；["*"] 表示该 server 的所有工具。
+  // 声明空对象 {} 可禁止本 agent 使用 config.loadMcp 中的所有 MCP 工具。
+  "loadMcp": {
+    "context7": ["resolve-library-id", "query-docs"]
+  }
+}

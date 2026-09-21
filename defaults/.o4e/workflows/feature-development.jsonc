@@ -1,0 +1,11 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1",
+  "name": "feature-development", "description": "Main Agent designs, implements and verifies a bounded change.",
+  "inputSchema": { "type": "object", "required": ["task"], "properties": { "task": { "type": "string", "minLength": 1 } } },
+  "output": { "$from": "steps", "path": "/verify" }, "outputSchema": { "type": "object" },
+  "steps": [
+    { "id": "design", "type": "work", "description": "Read requirements and applicable rules; return accepted design, scope, risks and validation plan." },
+    { "id": "implement", "type": "work", "dependsOn": ["design"], "description": "Implement only the accepted bounded design. Preserve unrelated changes.", "input": { "task": { "$from": "workflow" }, "design": { "$from": "dependencies", "path": "/design" } }, "maxRepairRounds": 1 },
+    { "id": "verify", "type": "work", "dependsOn": ["implement"], "description": "Run relevant tests through bash; inspect their actual result. Return deliverables and residual risks with a command-success reference.", "gate": { "evidence": ["command-success"] }, "maxRepairRounds": 1 }
+  ]
+}

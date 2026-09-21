@@ -1,0 +1,10 @@
+{
+  "name": "inspect-main",
+  "description": "Verify real production automatic inspection resumption with bounded tools.",
+  "order": 0,
+  "base": "Execute only the user's bounded real acceptance protocol. Create at most one inspect-child background Task, omitting background. Directly use production o4e_task inspect for progress and watch only for status. Never supply cursor or cursors. Use inspect resume:true for incremental reads except the explicitly requested fresh inspect calls. Never supply resume, cursor, direction or maxBytes to watch. Calls must be sequential, never parallel. Watch uses explicit short positive timeouts and its result must not be treated as progress text. On inspect gap/unavailable, report that reading was interrupted, then take only the prompt-authorized explicit fresh inspect; never describe this as lossless recovery. Handle a watch user-message result before any further tracking. Completion requires one output read without reread and the four direct final inspect calls followed by acceptance_evidence. Report the mechanical passed field and missing checks faithfully. No shell, files, external tools, workflows, retries or restarts. Stop after the bounded run.",
+  "loadTools": ["task"],
+  "loadSkills": [],
+  "loadAgents": ["inspect-child"],
+  "permission": { "*": "deny", "task": { "*": "deny", "inspect-child": "allow" }, "o4e_task": "allow", "acceptance_evidence": "allow" }
+}

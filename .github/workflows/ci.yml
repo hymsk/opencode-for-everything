@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # Linux-only for now; Windows compatibility is deferred to a later change.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm install --global opencode-ai@1.18.21
+      - run: opencode --version
+      - run: npm test
+      - name: Check scripts
+        run: node --check scripts/installer.mjs && node --check scripts/global-plugin-registry.mjs && node --check scripts/native-prompt-sync.mjs
+      - name: Build installation target
+        run: |
+          node scripts/installer.mjs install --no-tui --target .test
+          npm run build -- --target .test

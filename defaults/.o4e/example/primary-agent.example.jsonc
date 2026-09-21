@@ -1,0 +1,69 @@
+{
+  "$schema": "../schemas/primary-agent.schema.json",
+
+  // agent 名称，必须全局唯一，且与文件名一致。
+  // 格式：小写字母开头，只能包含小写字母、数字、连字符。
+  "name": "my-agent",
+
+  // 扩展 agent 的描述，显示在 selector 中。单行文本。
+  // 安装后的默认 agent 也在自身 JSONC 中维护该字段；仓库默认源只用于安装时选择和物化。
+  "description": "我的主 agent",
+  // default 保留模型配置；null 继承全局，[] 关闭 fallback。clear 不改此源文件。
+  "model": null,
+  "fallbackModels": [],
+
+  // 原生模式映射，可选 "build" 或 "plan"。
+  // 只有对应原生 Agent 配置为 managed 时才使用匹配的接管模板；普通自定义主 Agent 不需要此字段。
+  // 不设置则为普通主 agent，不接管原生模式。
+  // "nativeMode": "build",
+
+  // 显式 Plan Profile。mode:self 只生成 <name> (plan)；
+  // mode:child 保留可写角色并额外生成 <name> (plan)。
+  // 无后缀源名称和历史 <name> (Plan) 不作为 Plan Profile。
+  // 默认应用只读权限交集；对象内可覆盖 permission、工具、MCP、Agent、Workflow 和 reminder。
+  // "plan": { "mode": "child" },
+
+
+
+  // 内联基础提示词文本，不读取 promptsDir 文件。
+  // 与 systemPrompt 互斥。
+  // "base": "You are a focused implementation agent.",
+
+  // 系统提示词文件名称，相对于最终选定的 promptDir；省略文件扩展名 .md。
+  // 与 base 互斥。
+  "systemPrompt": "primary/my-agent/system",
+
+  // 注入提示词文件列表，相对于最终选定的 promptDir。
+  // 可与 systemPrompt 或 base 一起使用。
+  // "injects": ["primary/my-agent/inject-1", "primary/my-agent/inject-2"],
+
+  // 消息提示词文件名称，用于在用户消息前注入。
+  // "messagePrompt": "primary/my-agent/reminder",
+
+  // 提示词目录，相对于 .o4e/ 配置根。省略时使用适用的 Agent 默认值，否则继承 config.promptsDir。
+  // 例如下面的目录配合 systemPrompt，读取 .o4e/prompts/primary/my-agent/system.md。
+  // "promptDir": "prompts",
+
+  // 指令文件配置，覆盖 config.instructionFiles。
+  // 格式与 config.instructionFiles 相同。
+  "instructionFiles": {
+    "global": ["<default>"],
+    "project": ["<default>"]
+  },
+
+  // 允许发现的 Skill 名称。覆盖 config.loadSkills；* 表示不按名称限制，[] 表示全部拒绝。
+  "loadSkills": ["*"],
+
+  // 工具白名单，覆盖 config.loadTools。
+  // [] 关闭全部受管工具。
+  // 可选值：question, bash, read, glob, grep, edit, task, execute, webfetch, websearch, lsp, todowrite, skill
+  // 配置只接受 canonical edit；它同时控制宿主 edit、write 和 apply_patch。write 不是有效配置名。execute 是实验性 Code Mode，仅在宿主启用时出现。
+  "loadTools": ["bash", "read", "glob", "grep", "edit", "task", "execute", "webfetch", "websearch", "lsp", "todowrite", "skill"],
+
+  // MCP 工具白名单，覆盖 config.loadMcp。
+  // 键为 MCP server 名称，值为工具名；["*"] 表示该 server 的所有工具。
+  // 声明空对象 {} 可禁止本 agent 使用 config.loadMcp 中的所有 MCP 工具。
+  "loadMcp": {
+    "context7": ["resolve-library-id", "query-docs"]
+  }
+}

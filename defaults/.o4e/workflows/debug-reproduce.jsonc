@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "debug-reproduce",
+  "description": "Reproduce a reported failure directly.", "output": { "$from": "steps", "path": "/reproduce" },
+  "steps": [{ "id": "reproduce", "type": "work", "description": "Establish minimal reproducible steps and actual failure observations. An expected failing command is not command-success evidence; describe it in output with exact limitations." }]
+}

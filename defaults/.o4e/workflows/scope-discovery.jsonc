@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "scope-discovery",
+  "description": "Discover the bounded implementation scope.", "output": { "$from": "steps", "path": "/scope" },
+  "steps": [{ "id": "scope", "type": "work", "description": "Inspect relevant rules, implementation and tests. Return affected paths and contracts, dependencies and excluded scope. Do not modify unrelated files." }]
+}

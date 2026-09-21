@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "debug-fix",
+  "description": "Apply a bounded diagnosed fix directly.", "output": { "$from": "steps", "path": "/fix" },
+  "steps": [{ "id": "fix", "type": "work", "description": "Apply the smallest sufficient root-cause fix and add a regression test. Preserve unrelated user changes and report unverified outcomes.", "maxRepairRounds": 0 }]
+}

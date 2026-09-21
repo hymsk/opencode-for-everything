@@ -1,0 +1,27 @@
+{
+  "$schema": "../../schemas/subagent-agent.schema.json",
+  "name": "general",
+  "model": null,
+  "fallbackModels": [],
+  // [o4e:promptCore] 完整 system prompt 的 Markdown 路径；如改用 base 或 nativeSystem，必须删除本项并遵守三者互斥关系。
+  "systemPrompt": "subagent/general/system",
+  // [o4e:injects] 按顺序追加到 systemPrompt 后的 prompt 片段；[] 明确不追加。
+  "injects": ["shared/task-authority"],
+  // [o4e:messagePrompt] 当前未配置 messagePrompt。该字段没有 null/false 形式；仅在需要追加消息提示词时填写 Markdown 路径。
+  // [o4e:promptDir] 当前安装目标的 prompt 目录；修改时需同时迁移本文件引用的 Markdown。
+  "promptDir": "prompts/cn",
+  // [o4e:instructionFiles] 完整规则文件覆盖；某个范围使用 [] 表示不读取该范围的规则文件。
+  "instructionFiles": {
+    "global": [],
+    "project": []
+  },
+  // [o4e:loadTools] 完整受管 OpenCode permission 白名单；配置只接受 canonical edit，它同时控制宿主 edit、write 和 apply_patch；execute 是可选实验性 Code Mode；null 不接管 allow/deny，[] 全部拒绝。
+  "loadTools": null,
+  // [o4e:loadSkills] 完整 Skill 名称 allowlist；["*"] 不按名称限制，[] 全部拒绝，具体名称数组只开放对应 Skill。
+  "loadSkills": ["*"],
+  // [o4e:loadMcp] 完整 MCP 工具白名单；{"*": ["*"]} 开放全部 MCP，{} 明确关闭。
+  "loadMcp": { "*": ["*"] }
+  ,"loadAgents": []
+  ,"loadWorkflows": []
+  ,"capabilities": ["task.general"]
+}

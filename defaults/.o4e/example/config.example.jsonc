@@ -1,0 +1,93 @@
+{
+  "$schema": "../schemas/config.schema.json",
+
+  // 安装语言。安装目标只保留该语言的 prompt，并统一放在 .o4e/prompts/。
+  "language": "zh",
+
+  // 必填。四个 OpenCode 原生 Agent 都必须显式选择 keep、managed 或 disable。
+  "nativeAgents": {
+    "build": "disable",
+    "plan": "disable",
+    "general": "disable",
+    "explore": "disable"
+  },
+
+  // Background Task 重试预算与每个父 Session Task Group 的独立并发上限。
+  "backgroundTasks": {
+    "maxRetries": 1,
+    "maxConcurrentAgents": 4,
+    "maxConcurrentCommands": 4
+  },
+
+  // 灵魂文件配置，定义 agent 的核心人格和价值观。
+  // 注入到所有 agent 的最终 system prompt 最前面。
+  "soul": {
+    // 是否启用灵魂文件。默认 true。
+    "enabled": true,
+
+    // 项目灵魂文件名，相对于 .o4e/ 配置目录。默认 soul.md。
+    // 路径必须是配置目录内的相对路径，不能使用绝对路径或 .. 逃逸。
+    "file": "soul.md",
+
+    // 全局灵魂文件完整路径。必须是绝对路径。可选配置。
+    "globalFile": "/home/user/.config/opencode/.o4e/soul.md",
+
+    // 继承模式：
+    // - override：项目 soul 存在时使用项目 soul，否则使用全局 soul
+    // - extend：全局 soul 和项目 soul 合并，全局在前
+    "inheritMode": "override"
+  },
+
+  // 指令文件配置，定义 agent 读取的规则文件。
+  "instructionFiles": {
+    // 全局指令文件列表。
+    // - "<default>" 展开为 OpenCode 配置目录的 AGENTS.md
+    // - 其他项必须是绝对路径
+    // - [] 表示完全不读取该 scope
+    "global": ["<default>"],
+
+    // 项目指令文件列表。
+    // - "<default>" 展开为项目根目录的 AGENTS.md
+    // - 其他项必须是项目根目录内的相对路径
+    // - [] 表示完全不读取该 scope
+    "project": ["<default>"]
+  },
+
+  // 安装并物化到运行时的受管 Skill 精确名单；不支持 *。
+
+  // Agent 未显式声明 loadSkills 时使用的 Skill allowlist；* 表示不按名称限制，[] 表示全部拒绝。
+  "loadSkills": ["*"],
+
+  // 全局工具白名单。
+  // - 不设置时不接管 allow/deny 白名单
+  // - [] 关闭全部受管工具
+  // 可选值：question, bash, read, glob, grep, edit, task, execute, webfetch, websearch, lsp, todowrite, skill
+  // 配置只接受 canonical edit；它同时控制宿主 edit、write 和 apply_patch。write 不是有效配置名。execute 是实验性 Code Mode，仅在宿主启用时出现。
+  "loadTools": ["bash", "read", "glob", "grep", "edit", "task", "execute", "webfetch", "websearch", "lsp", "todowrite", "skill"],
+
+  // 受管 MCP server。只有在这里声明的 server 才由本组件写入 OpenCode 配置。
+  // 如需使用环境变量，请使用 OpenCode 的 {env:VAR_NAME} 语法，不要在本文件写入密钥。
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": { "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}" },
+      "enabled": true
+    }
+  },
+
+  // MCP 工具白名单。键为 MCP server 名称，值为可用工具名；["*"] 表示该 server 的全部工具。
+  // 声明后会先全局关闭该 server 的工具，再仅对获得授权的 agent 重新开启。
+  "loadMcp": {
+    "context7": ["resolve-library-id", "query-docs"]
+  },
+
+  // 提示词目录，相对于 .o4e/。安装目标默认 prompts。
+  "promptsDir": "prompts",
+
+  // agent 配置目录，相对于 .o4e/。默认 agents。
+  "agentsDir": "agents",
+
+  // Workflow 配置目录，相对于 .o4e/。默认 workflows。
+  "workflowsDir": "workflows"
+}

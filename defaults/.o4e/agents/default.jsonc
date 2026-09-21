@@ -1,0 +1,145 @@
+{
+  // [o4e:catalogSchema] 默认 agent 目录的 Schema；此文件保存 all/primary/subagent 元数据，不定义 system 内部阶段。
+  "$schema": "../schemas/default-agents.schema.json",
+  // [o4e:catalogAgents] 安装器按数组顺序展示这些默认 agent；新增或删除默认角色时同步维护其具体 JSONC。
+  "agents": [
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "orchestrator",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "all",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Orchestrator", "en": "Orchestrator" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "总工程师 / 调度", "en": "Chief engineer / Orchestrator" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "总工程师与任务调度，负责拆解目标、选择角色和收敛交付", "en": "Chief engineer for task decomposition, routing, and delivery convergence" },
+      "defaultEnabled": true
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "architect",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "subagent",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Architect", "en": "Architect" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "系统设计 / 模块关系", "en": "System design / Module relations" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "负责系统设计、模块关系、边界和演进方案", "en": "Designs systems, module relationships, boundaries, and evolution paths" },
+      "defaultEnabled": true
+    },
+    {
+      "id": "reviewer",
+      "type": "subagent",
+      "displayName": { "zh": "Reviewer", "en": "Reviewer" },
+      "roleName": { "zh": "独立代码 / 架构审查", "en": "Independent code / Architecture review" },
+      "description": { "zh": "独立审查代码与架构变更，识别实质风险和测试缺口", "en": "Independently reviews code and architecture changes for material risks and testing gaps" },
+      "defaultEnabled": true
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "researcher",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "subagent",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Researcher", "en": "Researcher" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "技术调研 / 知识获取", "en": "Technical research / Knowledge acquisition" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "证据驱动的只读调研与知识获取", "en": "Evidence-driven read-only research and knowledge acquisition" },
+      "defaultEnabled": true
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "chat",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "primary",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Chat", "en": "Chat" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "解释 / 需求澄清", "en": "Explanation / Requirement clarification" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "对话 Agent - 低成本对话与需求澄清", "en": "Chat Agent - Low-cost conversation and requirement clarification" },
+      "defaultEnabled": true
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "debugger",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "subagent",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Debugger", "en": "Debugger" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "漏洞定位 / 故障排除", "en": "Defect isolation / Troubleshooting" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "复现问题、定位根因、修复故障并补回归验证", "en": "Reproduces issues, isolates root causes, fixes defects, and adds regression checks" },
+      "defaultEnabled": true
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "tester",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "subagent",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Tester", "en": "Tester" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "测试 / 验证", "en": "Testing / Verification" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "设计测试、覆盖边界、执行验证并报告证据", "en": "Designs tests, covers boundaries, runs verification, and reports evidence" },
+      "defaultEnabled": true
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "build",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "primary",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Build", "en": "Build" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "原生实现入口", "en": "Native implementation entry" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "构建 Agent - 负责代码实现和验证", "en": "Build Agent - Code implementation and verification" },
+      "defaultEnabled": false
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "plan",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "primary",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Plan", "en": "Plan" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "原生只读规划入口", "en": "Native read-only planning entry" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "规划 Agent - 只读规划和方案设计", "en": "Plan Agent - Read-only planning and design" },
+      "defaultEnabled": false
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "general",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "subagent",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "General", "en": "General" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "通用子任务", "en": "General delegated task" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "通用子 Agent", "en": "General subagent" },
+      "defaultEnabled": false
+    },
+    {
+      // [o4e:catalogId] 稳定默认 agent ID；必须与对应目录中的文件名和 name 一致。
+      "id": "explore",
+      // [o4e:catalogType] 决定具体 JSONC 所在的 all、primary 或 subagent 目录；源文件不声明 mode。
+      "type": "subagent",
+      // [o4e:catalogDisplayName] 安装器显示名称，必须同时提供 zh 和 en。
+      "displayName": { "zh": "Explore", "en": "Explore" },
+      // [o4e:catalogRoleName] 安装器显示的简短职责，必须同时提供 zh 和 en。
+      "roleName": { "zh": "只读代码探索", "en": "Read-only code exploration" },
+      // [o4e:catalogDescription] 运行时 selector description，必须同时提供 zh 和 en，且不能在默认具体 JSONC 中重复声明。
+      "description": { "zh": "探索子 Agent - 只读代码探索", "en": "Explore subagent - Read-only code exploration" },
+      "defaultEnabled": false
+    }
+  ]
+}

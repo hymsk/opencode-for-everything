@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "code-review",
+  "description": "Review code and architecture directly without mandatory delegation.",
+  "output": { "$from": "steps", "path": "/review" },
+  "steps": [{ "id": "review", "type": "work", "description": "Read the relevant diff, contracts and tests. Report actionable findings with locations, severity and verification gaps; distinguish judgment from mechanically verified facts." }]
+}

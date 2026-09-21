@@ -1,0 +1,61 @@
+{
+  "name": "@hymsk/o4e",
+  "version": "0.1.0-rc.1",
+  "description": "A configurable, evolvable agent-plugin system for OpenCode.",
+  "license": "AGPL-3.0-or-later",
+  "author": {
+    "name": "hymsk",
+    "email": "lxj_hymsk@163.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hymsk/opencode-for-everything.git"
+  },
+  "homepage": "https://github.com/hymsk/opencode-for-everything#readme",
+  "bugs": {
+    "url": "https://github.com/hymsk/opencode-for-everything/issues"
+  },
+  "keywords": [
+    "opencode",
+    "agent",
+    "multi-agent",
+    "ai",
+    "cli"
+  ],
+  "files": [
+    "scripts/",
+    "src/",
+    "defaults/.o4e/",
+    "README.md",
+    "README.zh-cn.md",
+    "VERSION",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "type": "module",
+  "exports": {
+    "./server": "./src/plugin.ts",
+    "./tui": "./src/tui/index.tsx"
+  },
+  "bin": {
+    "o4e": "scripts/installer.mjs"
+  },
+  "scripts": {
+    "build": "node scripts/installer.mjs build",
+    "test": "node test/run.mjs",
+    "test:verbose": "node test/run.mjs --verbose",
+    "install:interactive": "node scripts/installer.mjs install",
+    "install:silent": "node scripts/installer.mjs install --no-tui"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "jsonc-parser": "3.3.1",
+    "tree-sitter-bash": "0.25.0",
+    "web-tree-sitter": "0.25.10"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.18.21"
+  }
+}

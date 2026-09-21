@@ -1,0 +1,10 @@
+{
+  "$schema": "../../../schemas/workflow.schema.json",
+  "contract": "process-v1", "name": "bounded-process", "description": "Main-Agent serial checkpoints",
+  "visibility": "entry", "output": { "$from": "steps", "path": "/verify" },
+  "steps": [
+    { "id": "plan", "type": "work", "description": "Read requirements and define acceptance." },
+    { "id": "implement", "type": "work", "dependsOn": ["plan"], "description": "Implement the authorized bounded change." },
+    { "id": "verify", "type": "work", "dependsOn": ["implement"], "description": "Run tests and read actual results.", "gate": { "evidence": ["command-success"] } }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "bug-fix",
+  "description": "Reproduce, fix, and verify a bug in the main Session.",
+  "output": { "$from": "steps", "path": "/verify" },
+  "steps": [
+    { "id": "diagnose", "type": "work", "description": "Reproduce the failure and establish a supported root cause before editing." },
+    { "id": "fix", "type": "work", "dependsOn": ["diagnose"], "description": "Apply a bounded root-cause fix and regression test.", "input": { "$from": "dependencies", "path": "/diagnose" } },
+    { "id": "verify", "type": "work", "dependsOn": ["fix"], "description": "Run regression tests and report actual outcomes and remaining uncertainty.", "gate": { "evidence": ["command-success"] } }
+  ]
+}

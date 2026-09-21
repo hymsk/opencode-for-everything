@@ -1,0 +1,9 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "investigation",
+  "description": "Investigate a bounded question using sequential checkpoints.", "output": { "$from": "steps", "path": "/conclude" },
+  "steps": [
+    { "id": "scope", "type": "work", "description": "Define the question, relevant sources and excluded scope." },
+    { "id": "inspect", "type": "work", "dependsOn": ["scope"], "description": "Inspect evidence for and against the working hypotheses." },
+    { "id": "conclude", "type": "work", "dependsOn": ["inspect"], "input": { "$from": "dependencies", "path": "/inspect" }, "description": "Return supported conclusions, alternatives and remaining gaps." }
+  ]
+}

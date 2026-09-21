@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "external-research",
+  "description": "Perform source-based external research directly.", "output": { "$from": "steps", "path": "/research" },
+  "steps": [{ "id": "research", "type": "work", "description": "Research the bounded question using appropriate sources. Separate quotations, observed facts, inferences, conflicting sources and unanswered questions. Artifacts are declarations, not runtime-verified web facts." }]
+}

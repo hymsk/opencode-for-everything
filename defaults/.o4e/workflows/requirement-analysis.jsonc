@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "requirement-analysis",
+  "description": "Clarify requirements directly in the main Session.", "output": { "$from": "steps", "path": "/requirements" },
+  "steps": [{ "id": "requirements", "type": "work", "description": "Read the user goal and applicable constraints. Return scope, acceptance criteria, explicit assumptions and unresolved questions. Do not invent authorization." }]
+}

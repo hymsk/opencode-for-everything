@@ -1,0 +1,22 @@
+{
+  "$schema": "../../schemas/system-phase-agent.schema.json",
+  // [o4e:systemScope] 固定 OpenCode 内部阶段；只能使用 system/ 目录中允许的名称，且不支持模型或 Plan 字段。
+  "name": "title",
+  // [o4e:systemPrompt] 固定内部阶段的完整 system prompt Markdown 路径；system 阶段不支持 base 或 nativeSystem。
+  "systemPrompt": "system/title/system",
+  // [o4e:injects] 按顺序追加到 systemPrompt 后的 prompt 片段；[] 明确不追加。
+  "injects": [],
+  // [o4e:promptDir] 当前安装目标的 prompt 目录；修改时需同时迁移本文件引用的 Markdown。
+  "promptDir": "prompts/cn",
+  // [o4e:instructionFiles] 完整规则文件覆盖；某个范围使用 [] 表示不读取该范围的规则文件。
+  "instructionFiles": {
+    "global": [],
+    "project": []
+  },
+  // [o4e:loadTools] 完整受管 OpenCode permission 白名单；配置只接受 canonical edit，它同时控制宿主 edit、write 和 apply_patch；execute 是可选实验性 Code Mode；null 不接管 allow/deny，[] 全部拒绝。
+  "loadTools": [],
+  // [o4e:loadSkills] 完整 Skill 名称 allowlist；["*"] 不按名称限制，[] 全部拒绝，具体名称数组只开放对应 Skill。
+  "loadSkills": [],
+  // [o4e:loadMcp] 完整 MCP 工具白名单；{"*": ["*"]} 开放全部 MCP，{} 明确关闭。
+  "loadMcp": {}
+}

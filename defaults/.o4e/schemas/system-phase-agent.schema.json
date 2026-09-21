@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opencode-for-everything fixed system phase agent",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string", "format": "uri-reference" },
+    "name": { "enum": ["compaction", "title", "summary"] },
+    "systemPrompt": { "$ref": "./agent-common.schema.json#/$defs/promptName" },
+    "injects": { "type": "array", "items": { "$ref": "./agent-common.schema.json#/$defs/promptName" }, "uniqueItems": true },
+    "promptDir": { "type": "string", "minLength": 1 },
+    "instructionFiles": { "$ref": "./agent-common.schema.json#/$defs/instructionFiles" },
+    "loadSkills": { "$ref": "./agent-common.schema.json#/$defs/loadableSkillNameList" },
+    "loadTools": { "$ref": "./agent-common.schema.json#/$defs/nullableToolNameList" },
+    "loadMcp": { "$ref": "./agent-common.schema.json#/$defs/mcpToolAccess" },
+    "blockSkills": { "$ref": "./agent-common.schema.json#/$defs/blockNameList" },
+    "blockTools": { "$ref": "./agent-common.schema.json#/$defs/toolNameList" },
+    "blockMcp": { "$ref": "./agent-common.schema.json#/$defs/blockNameList" }
+
+  },
+  "required": ["name", "systemPrompt"],
+  "additionalProperties": false
+}

@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opencode-for-everything config",
+  "type": "object",
+  "properties": {
+    "enableWorkflow": { "type": "boolean", "default": false, "description": "Explicitly opt in to experimental Beta Workflow checkpoints. Disabled by default; not a supported production feature. Rebuild and restart after changing." },
+    "enable_o4e_task_detail": { "type": "boolean", "default": false, "description": "Show o4e_task result bodies to humans. When false only its call line is shown; the model receives the full bounded result through message projection. Other tools and host display preferences are unchanged." },
+    "$schema": { "type": "string", "format": "uri-reference" },
+    "language": { "type": "string", "enum": ["zh", "en"] },
+    "defaultModel": { "$ref": "./agent-common.schema.json#/$defs/nullableModelRef" },
+    "fallbackModels": { "type": "array", "items": { "$ref": "./agent-common.schema.json#/$defs/modelRef" }, "uniqueItems": true },
+    "defaultAgent": { "type": "string", "pattern": "^[a-z][a-z0-9-]*( \\(plan\\))?$", "description": "Optional configured selectable Agent or Plan Profile used as the OpenCode default." },
+    "backgroundTasks": { "$ref": "#/$defs/backgroundTasksConfig" },
+    "maxDelegationDepth": { "type": "integer", "minimum": 1, "maximum": 5, "default": 2, "description": "Global Agent delegation depth limit; the root Agent is depth 0. Main-Session Workflow Steps do not increase delegation depth. Increasing the default is not recommended; Agents and task calls cannot override it." },
+    "nativeAgents": { "$ref": "#/$defs/nativeAgentsConfig" },
+    "agentDefaults": { "$ref": "#/$defs/promptDefaults" },
+    "soul": { "$ref": "#/$defs/soulConfig" },
+    "instructionFiles": {
+      "type": "object",
+      "properties": {
+        "global": { "$ref": "./agent-common.schema.json#/$defs/absoluteInstructionFileList" },
+        "project": { "$ref": "./agent-common.schema.json#/$defs/relativeInstructionFileList" }
+      },
+      "additionalProperties": false
+    },
+    "loadSkills": { "$ref": "./agent-common.schema.json#/$defs/loadableSkillNameList" },
+    "loadTools": { "$ref": "./agent-common.schema.json#/$defs/nullableToolNameList" },
+    "loadMcp": { "$ref": "./agent-common.schema.json#/$defs/mcpToolAccess" },
+    "blockSkills": { "$ref": "./agent-common.schema.json#/$defs/blockNameList" },
+    "blockTools": { "$ref": "./agent-common.schema.json#/$defs/toolNameList" },
+    "blockMcp": { "$ref": "./agent-common.schema.json#/$defs/blockNameList" },
+    "blockAgents": { "$ref": "./agent-common.schema.json#/$defs/blockNameList" },
+    "blockWorkflows": { "$ref": "./agent-common.schema.json#/$defs/blockNameList" },
+    "permission": { "$ref": "./agent-common.schema.json#/$defs/permissionConfig" },
+    "loadAgents": { "$ref": "./agent-common.schema.json#/$defs/loadableAgentNameList" },
+    "loadWorkflows": { "$ref": "./agent-common.schema.json#/$defs/loadableWorkflowNameList" },
+    "mcp": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/mcpServer" }
+    },
+    "promptsDir": { "type": "string", "minLength": 1 },
+    "agentsDir": { "type": "string", "minLength": 1 },
+    "workflowsDir": { "type": "string", "minLength": 1 },
+    "_comment": { "type": "string" }
+  },
+  "required": ["nativeAgents"],
+  "additionalProperties": false,
+  "$defs": {
+    "nativeAgentStrategy": {
+      "type": "string",
+      "enum": ["keep", "managed", "disable"]
+    },
+    "nativeAgentsConfig": {
+      "type": "object",
+      "properties": {
+        "build": { "$ref": "#/$defs/nativeAgentStrategy" },
+        "plan": { "$ref": "#/$defs/nativeAgentStrategy" },
+        "general": { "$ref": "#/$defs/nativeAgentStrategy" },
+        "explore": { "$ref": "#/$defs/nativeAgentStrategy" }
+      },
+      "required": ["build", "plan", "general", "explore"],
+      "additionalProperties": false
+    },
+    "backgroundTasksConfig": {
+      "type": "object",
+      "properties": {
+        "maxRetries": { "type": "integer", "minimum": 0, "default": 1 },
+        "maxConcurrentAgents": { "type": "integer", "minimum": 1, "default": 4 },
+        "maxConcurrentCommands": { "type": "integer", "minimum": 1, "default": 4 }
+      },
+      "additionalProperties": false
+    },
+    "mcpServer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "local" },
+            "command": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+            "cwd": { "type": "string", "minLength": 1 },
+            "environment": { "type": "object", "additionalProperties": { "type": "string" } },
+            "enabled": { "type": "boolean" },
+            "timeout": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["type", "command"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": { "const": "remote" },
+            "url": { "type": "string", "minLength": 1 },
+            "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+            "oauth": {
+              "oneOf": [
+                { "const": false },
+                {
+                  "type": "object",
+                  "properties": {
+                    "clientId": { "type": "string", "minLength": 1 },
+                    "clientSecret": { "type": "string", "minLength": 1 },
+                    "scope": { "type": "string", "minLength": 1 },
+                    "callbackPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                    "redirectUri": { "type": "string", "minLength": 1 }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "enabled": { "type": "boolean" },
+            "timeout": { "type": "integer", "minimum": 1 }
+          },
+          "required": ["type", "url"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } },
+          "required": ["enabled"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "soulConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "file": { "type": "string", "minLength": 1, "default": "soul.md" },
+        "globalFile": { "type": "string", "minLength": 1 },
+        "inheritMode": {
+          "type": "string",
+          "enum": ["override", "extend"],
+          "default": "override"
+        }
+      },
+      "additionalProperties": false
+    },
+    "promptDefaults": {
+      "type": "object",
+      "properties": {
+        "nativeSystem": { "$ref": "./agent-common.schema.json#/$defs/nativeSystem" },
+        "base": { "type": "string" },
+        "systemPrompt": { "$ref": "./agent-common.schema.json#/$defs/promptName" },
+        "injects": { "type": "array", "items": { "$ref": "./agent-common.schema.json#/$defs/promptName" }, "uniqueItems": true },
+        "messagePrompt": { "$ref": "./agent-common.schema.json#/$defs/promptName" },
+        "promptDir": { "type": "string", "minLength": 1 }
+      },
+      "anyOf": [
+        { "required": ["nativeSystem"] },
+        { "required": ["base"] },
+        { "required": ["systemPrompt"] },
+        { "required": ["injects"] }
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        { "not": { "required": ["base", "systemPrompt"] } },
+        { "not": { "required": ["nativeSystem", "base"] } },
+        { "not": { "required": ["nativeSystem", "systemPrompt"] } },
+        { "not": { "required": ["nativeSystem", "injects"] } }
+      ]
+    }
+  }
+}

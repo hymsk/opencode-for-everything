@@ -1,0 +1,9 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "quality-gate",
+  "description": "Explicit independent review Task followed by main-Agent result handling.",
+  "output": { "$from": "steps", "path": "/collect" },
+  "steps": [
+    { "id": "review", "type": "work", "description": "Call the existing task tool for reviewer (plan). Workflow permission does not authorize that call. Attach its trusted task-created reference; creation is not review success.", "execution": { "mode": "task", "agent": "reviewer (plan)" }, "gate": { "evidence": ["task-created"] } },
+    { "id": "collect", "type": "work", "dependsOn": ["review"], "description": "Use o4e_task watch/output to obtain the completed review Task created by the accepted review Step; address its findings and report residual risks. Workflow never waits for or cancels the Task.", "gate": { "evidence": [{ "kind": "task-result", "taskFrom": "review" }] } }
+  ]
+}

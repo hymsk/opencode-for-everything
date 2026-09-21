@@ -1,0 +1,87 @@
+{
+  // Workflow is experimental Beta, not a supported production feature. Explicit opt-in only; rebuild and restart after changing.
+  "enableWorkflow": false,
+  "enable_o4e_task_detail": false,
+  "$schema": "./schemas/config.schema.json",
+  // 可选默认主 Agent，例如 "defaultAgent": "orchestrator"；省略则不指定宿主默认入口。
+
+  // 安装语言。仓库默认源同时维护 cn/en；安装目标会把选中语言扁平化到 prompts/。
+  "language": "zh",
+
+  // default 模式保留模型配置；null 沿用宿主选择。clear 只清除运行时投影，不改此源文件。
+  // 可填写 "provider/model" 或 { "id": "provider/model", "variant": "high" }。
+  "defaultModel": null,
+  // Agent 省略 fallbackModels 时继承此有序候选列表；[] 表示无额外候选。候选仅供诊断和显式决策，O4E 不自动重试模型或切换 fallback。
+  "fallbackModels": [],
+
+  // OpenCode 原生 Agent 策略：keep 保留宿主原生定义，managed 由 O4E 接管并允许在 .o4e 中定制提示词，disable 从宿主 Agent 列表中禁用。
+  // 本仓库默认源包含四个可接管的配置模板，因此这里全部为 managed；安装器会根据最终选择物化该对象并删除未接管的模板。
+  "nativeAgents": {"build":"managed","plan":"managed","general":"managed","explore":"managed"},
+
+  // Background Task 默认预算和每个父 Session Task Group 的并发槽位。
+  "backgroundTasks": {
+    "maxRetries": 1,
+    "maxConcurrentAgents": 4,
+    "maxConcurrentCommands": 4
+  },
+
+  // 全局 Agent 委派深度上限：主 Agent 为 0，默认允许到 2；只接受 1 到 5 的整数。
+  // 不建议放宽默认值，最多为 5；Agent 配置和 task 参数不能覆盖。Workflow 主会话 Step 不增加委派深度。
+  "maxDelegationDepth": 2,
+
+  // 灵魂文件配置，定义 agent 的核心人格和价值观。
+  "soul": {
+    "enabled": true,
+    "file": "soul.md",
+    "inheritMode": "override"
+  },
+
+  // 指令文件配置，定义 agent 读取的规则文件。
+  "instructionFiles": {
+    // <default> 展开为 OpenCode 配置目录的 AGENTS.md
+    "global": ["<default>"],
+    // <default> 展开为项目根目录的 AGENTS.md；项目可自行显式加入其他项目规则文件
+    "project": ["<default>"]
+  },
+
+  // Agent 未显式声明时允许发现的 Skill 名称；* 表示不按名称限制。
+  "loadSkills": ["*"],
+
+  // 默认受管 OpenCode permission 白名单。配置只接受 canonical edit；它同时控制宿主 edit、write 和 apply_patch。write 不是有效配置名。execute 是可选实验性 Code Mode。
+  // null 表示不接管 allow/deny 白名单，[] 表示全部拒绝；完整列表为 ["question", "bash", "read", "glob", "grep", "edit", "task", "execute", "webfetch", "websearch", "lsp", "todowrite", "skill"]。
+  "loadTools": null,
+
+  // 受管 MCP server。默认不接管任何 MCP；在此添加 local 或 remote server。
+  "mcp": {},
+
+  // 默认 MCP 工具白名单。默认开放全部 MCP；使用 {} 或 blockMcp 显式关闭。
+  "loadMcp": { "*": ["*"] },
+
+  // 默认允许跨目录访问；实际读取、写入和执行仍由角色工具权限与任务授权约束。
+  // 可使用 allow/ask/deny 或按权限名配置；Agent 自身显式 permission 完整覆盖此默认值。
+  "permission": { "external_directory": "allow" },
+
+  // 默认允许 Agent 发现并调用 all/subagent；primary-only Agent 不会被委派。
+  "loadAgents": ["*"],
+
+  // config 级回退加载全部 entry Workflow。仓库默认 Agent 会按角色显式覆盖：协调角色加载交付入口，专业角色加载自身专用入口，默认 subagent 仍为 []。
+  "loadWorkflows": ["*"],
+
+  // 提示词目录，相对于 .o4e/。仓库默认源使用 prompts/cn；安装目标会改为 prompts/。
+  "promptsDir": "prompts/cn",
+
+  // agent 配置目录，相对于 .o4e/。默认 agents。
+  "agentsDir": "agents",
+
+  // Workflow 配置目录，相对于 .o4e/。
+  "workflowsDir": "workflows",
+
+  // 说明：默认安装两个可选择主角色：all 下的 orchestrator（同时生成 orchestrator (plan)）和 primary 下的 chat；architect、reviewer、researcher、debugger、tester 位于 subagent，仅作为受管委派目标。安装器会先选择原生 Agent 预设；只有选择 custom 时，才逐项设置 build/plan/general/explore 的 keep/managed/disable 策略。
+  // plan 是显式对象：所有 Profile 使用 <name> (plan)；mode:self 只生成该 Profile，mode:child 还保留可写源角色。原生 plan 也映射到小写后缀，源名称不得包含括号，默认权限取只读交集，用户显式配置优先。
+  // 每个 Agent 可通过 permission、loadAgents、loadWorkflows 和 capabilities 自配置；capabilities 使用稳定点分 Skill ID。原生 task 被 Runtime 委派替代，支持逐层授权且不扩大祖先范围的嵌套委派。
+  // Workflow 使用 process-v1 主会话串行检查点；Run 保存在 owner Session metadata，不创建 Workflow Session，也不支持嵌套 Subflow。主 Agent 显式 begin/report；新用户指令后显式 resume，不重放副作用。需要子任务时仍独立调用受管 task。
+  // managed build/plan 通过 nativeMode 接管；managed general/explore 使用同名 subagent 接管；system 的 compaction/title/summary 默认继续接管。
+  // instructionFiles 默认读取全局 AGENTS.md 和项目 AGENTS.md；[] 表示该范围完全不读取。
+  // soul 配置定义灵魂文件，支持全局和项目级覆盖。
+  "_comment": "默认安装 orchestrator、architect、reviewer、researcher、chat、debugger、tester；原生 build、plan、general、explore 通过 nativeAgents 分别选择 keep、managed 或 disable。all Agent 同时可作主 Agent 和子 Agent，primary 仅可作主 Agent，subagent 仅可被委派。所有 Plan Profile 使用 <name> (plan)：mode=self 只生成该 Profile，mode=child 还保留源 Agent；原生 plan 也映射到小写后缀，源名称不得包含括号。默认只读交集可由用户显式 Plan 配置覆盖。Agent 可配置 permission、loadAgents、loadWorkflows 和 capabilities。Workflow 使用 process-v1，在 owner Session metadata 保存串行检查点；不创建执行 Session，不支持嵌套，新用户指令后由主 Agent 显式恢复且不重放副作用。"
+}

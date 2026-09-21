@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "evidence-gathering",
+  "description": "Gather relevant observations without claiming unsupported proof.", "output": { "$from": "steps", "path": "/gather" },
+  "steps": [{ "id": "gather", "type": "work", "description": "Inspect relevant source and test results. Return reproducible observations, references and uncertainties. Put prose observations in output/artifacts; evidence accepts only supported trusted tool references." }]
+}

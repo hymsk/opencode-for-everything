@@ -1,0 +1,8 @@
+{
+  "skill_name": "o4e-workflow-creator",
+  "evals": [
+    { "id": 1, "prompt": "创建由主 Agent 设计、实施、验证的三步 Workflow，不默认委派。", "expected_output": "process-v1 work Step 串行检查点，严格 Gate 与有限修复。", "files": [], "expectations": ["只编辑 .o4e 真实源", "默认 self 且不创建子 Session", "仅接受依赖 output", "验证使用可信 command-success 引用"] },
+    { "id": 2, "prompt": "要求 Workflow 自动并行隔离写入，并通过嵌套 Loop 重试。", "expected_output": "明确拒绝当前不支持的嵌套、Loop、并行主 Step 和硬隔离声明；实际隔离需独立 Task 授权。", "files": [], "expectations": ["不静默降级为 Prompt", "不把 Workflow 授权兑换为 task", "不实现兼容旧定义"] },
+    { "id": 3, "prompt": "设计主会话中断恢复和独立 reviewer Task 结果验收。", "expected_output": "owner 检查点、revision/幂等 report、新消息后显式 resume；Task 生命周期独立。", "files": [], "expectations": ["不扫描旧会话", "active Attempt 不重放", "创建不等于结果", "结果须已读取 output", "pause/stop 不取消 Task", "不承诺跨进程 exactly-once"] }
+  ]
+}

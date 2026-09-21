@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "test-design",
+  "description": "Design meaningful validation in the main Session.", "output": { "$from": "steps", "path": "/design" },
+  "steps": [{ "id": "design", "type": "work", "description": "Read requirements and existing tests. Define happy path, permission boundaries, persistence failures, interruption and regression checks. Distinguish planned tests from executed evidence." }]
+}

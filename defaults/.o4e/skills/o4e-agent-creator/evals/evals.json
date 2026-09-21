@@ -1,0 +1,60 @@
+{
+  "skill_name": "o4e-agent-creator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "在一个已经安装 o4e 的 TypeScript 项目中新增 security-auditor，只读审查认证、权限和敏感数据风险。请给出应该修改的 .o4e 文件和初版配置，不要直接改 .opencode。",
+      "expected_output": "选择 all、primary 或 subagent 的合理边界，提供符合 o4e Schema 的配置与 prompt 方案，使用只读工具和明确的验证步骤。",
+      "files": [],
+      "expectations": [
+        "编辑的文件路径全部以 .o4e/ 开头，不包含 .opencode/",
+        "loadTools 不包含 bash、edit（只读角色；edit 同时控制宿主 write/apply_patch）",
+        "包含 node scripts/installer.mjs build --target ... 命令",
+        "Agent 名称全局唯一且与文件名一致",
+        "prompt 文件路径与所选 all/primary/subagent 类型一致",
+        "仓库默认模板同时创建 cn 和 en 两个版本"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "现有 orchestrator 经常忽略项目规则中的验收标准，而且复杂实现任务没有调用声明式 feature-development Workflow。请按 o4e 的方式优化它，并保留 orchestrator (plan)；不要让 Tester 或 Reviewer 默认加载这个开发 Workflow。",
+      "expected_output": "检查 config 与 orchestrator 的 instructionFiles 继承，保留 plan.mode=child 和完整实现工具，配置稳定 Skill ID 与角色化 loadWorkflows，并提出项目规则驱动的测试场景。",
+      "files": [],
+      "expectations": [
+        "说明 config 级 instructionFiles 的项目文件加载语义",
+        "保留 plan.mode=child 不变",
+        "orchestrator 与 orchestrator (plan) 的权限有区别（Plan 更受限）",
+        "检查 process-v1 Workflow 默认为主 Agent 执行；显式 execution.mode=task 的目标另行满足 loadAgents 和 Task 授权，不使用 preferred bindings",
+        "复杂实现任务使用 feature-development，Tester/Reviewer 不加载该无关开发入口，但可以保留各自专用的 test/review entry",
+        "capabilities 使用稳定点分 Skill ID，但不声称 process-v1 通过 Step.skill 匹配或自动派发 Agent",
+        "主 Agent 可按现有权限按需加载 O4E Skill，Workflow 不授予 Skill 或工具权限",
+        "说明 loadTools 变更需要 rebuild + restart"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "给 o4e 增加一个新的 deployment 系统阶段，让它在每次发布前自动运行。",
+      "expected_output": "识别 system 阶段只能是 compaction/title/summary，不创建非法配置；建议使用 all/primary Agent 或外部命令流程，并解释取舍。",
+      "files": [],
+      "expectations": [
+        "明确拒绝创建 deployment system agent",
+        "说明 system/ 只支持 compaction、title、summary",
+        "提供替代方案（all/primary Agent + 外部 CI/CD 脚本）",
+        "不静默接受非法请求"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "帮我审查一下当前项目中 researcher 这个 agent 的配置，看看有没有可以改进的地方。",
+      "expected_output": "读取 researcher.jsonc 和 prompt，检查权限边界、项目规则覆盖、Plan Profile 配置、工具集合理性，并给出具体改进建议。",
+      "files": [],
+      "expectations": [
+        "实际读取了 researcher.jsonc 和对应的 prompt 文件",
+        "检查 loadTools 是否与只读调研角色匹配",
+        "如果角色需要额外项目契约，检查 instructionFiles 是否显式包含对应路径；否则确认角色保持隔离",
+        "检查显式 Plan mode 和 Plan Profile 的权限交集",
+        "给出具体的改进建议而非泛泛而谈"
+      ]
+    }
+  ]
+}

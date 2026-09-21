@@ -1,0 +1,6 @@
+# Local OpenCode installation used only for manual verification.
+.test/
+
+node_modules/
+*.log
+.DS_Store

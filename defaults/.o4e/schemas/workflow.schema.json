@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "O4E main-Agent process-v1 Workflow",
+  "type": "object", "additionalProperties": false,
+  "required": ["contract", "name", "description", "output", "steps"],
+  "properties": {
+    "$schema": { "type": "string" }, "contract": { "const": "process-v1" },
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "description": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "visibility": { "enum": ["entry", "internal"] },
+    "inputSchema": { "$ref": "#/$defs/valueSchema" },
+    "outputSchema": { "$ref": "#/$defs/valueSchema" },
+    "output": { "$ref": "#/$defs/outputTemplate" },
+    "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/step" } }
+  },
+  "$defs": {
+    "valueSchema": {
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": {
+        "type": { "enum": ["object", "array", "string", "number", "integer", "boolean", "null"] },
+        "description": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "properties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/valueSchema" } },
+        "required": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+        "additionalProperties": { "type": "boolean" },
+        "items": { "$ref": "#/$defs/valueSchema" },
+        "enum": { "type": "array", "minItems": 1 },
+        "minLength": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "minItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      },
+      "description": "Runtime additionally rejects keywords incompatible with type and required names missing from properties. Unsupported JSON Schema keywords fail closed."
+    },
+    "inputTemplate": {
+      "oneOf": [
+        { "type": "object", "required": ["$from"], "additionalProperties": false, "properties": { "$from": { "enum": ["workflow", "dependencies"] }, "path": { "type": "string", "pattern": "^(/|$)" }, "default": { "$ref": "#/$defs/inputTemplate" } } },
+        { "type": "object", "not": { "required": ["$from"] }, "additionalProperties": { "$ref": "#/$defs/inputTemplate" } },
+        { "type": "array", "items": { "$ref": "#/$defs/inputTemplate" } },
+        { "type": ["string", "number", "boolean", "null"] }
+      ]
+    },
+    "outputTemplate": {
+      "oneOf": [
+        { "type": "object", "required": ["$from"], "additionalProperties": false, "properties": { "$from": { "const": "steps" }, "path": { "type": "string", "pattern": "^(/|$)" }, "default": { "$ref": "#/$defs/outputTemplate" } } },
+        { "type": "object", "not": { "required": ["$from"] }, "additionalProperties": { "$ref": "#/$defs/outputTemplate" } },
+        { "type": "array", "items": { "$ref": "#/$defs/outputTemplate" } },
+        { "type": ["string", "number", "boolean", "null"] }
+      ]
+    },
+    "step": {
+      "type": "object", "additionalProperties": false, "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "not": { "enum": ["constructor", "prototype"] } }, "type": { "const": "work" },
+        "description": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "dependsOn": { "type": "array", "items": { "type": "string", "minLength": 1, "pattern": "\\S" } },
+        "input": { "$ref": "#/$defs/inputTemplate" },
+        "inputSchema": { "$ref": "#/$defs/valueSchema" }, "outputSchema": { "$ref": "#/$defs/valueSchema" },
+        "maxRepairRounds": { "type": "integer", "minimum": 0, "maximum": 10, "default": 2 },
+        "execution": { "oneOf": [
+          { "type": "object", "additionalProperties": false, "required": ["mode"], "properties": { "mode": { "const": "self" } } },
+          { "type": "object", "additionalProperties": false, "required": ["mode", "agent"], "properties": { "mode": { "const": "task" }, "agent": { "type": "string", "minLength": 1, "pattern": "\\S" } } }
+        ] },
+        "gate": { "type": "object", "additionalProperties": false, "properties": {
+          "artifactsMin": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "evidence": { "type": "array", "uniqueItems": true, "items": { "oneOf": [
+            { "enum": ["command-success", "task-created", "task-result"] },
+            { "type": "object", "additionalProperties": false, "required": ["kind", "taskFrom"], "properties": {
+              "kind": { "const": "task-result" }, "taskFrom": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+            } }
+          ] } }
+        } }
+      }
+    }
+  }
+}

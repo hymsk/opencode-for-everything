@@ -1,0 +1,41 @@
+{
+  // agent-common.schema.json 是共享类型定义文件，被其他 schema 引用。
+  // 此示例展示各类型的使用方式。
+
+  // === 模型引用 (modelRef) ===
+  // 支持两种格式：
+  // 1. 字符串格式："provider/model-name"
+  // 2. 对象格式：{ "id": "provider/model-name", "variant": "high" }
+  "modelRef-string": "provider/model-name",
+  "modelRef-object": {
+    "id": "provider/model-name",
+    "variant": "high"
+  },
+
+  // === Agent 名称 (agentName) ===
+  // 格式：小写字母开头，只能包含小写字母、数字、连字符
+  // 示例：build, plan, orchestrator, my-agent, sub-agent-1
+  "agentName": "my-agent",
+
+  // === 提示词名称 (promptName) ===
+  // 格式：小写字母开头，用 / 分隔路径
+  // 示例：primary/build/system, subagent/general/system, system/compaction/system
+  "promptName": "primary/my-agent/system",
+
+  // === 指令文件列表 (instructionFiles) ===
+  // 包含 global 和 project 两个数组
+  "instructionFiles": {
+    // global: 全局指令文件，必须是绝对路径或 <default>
+    // <default> 展开为 OpenCode 配置目录的 AGENTS.md
+    "global": ["<default>"],
+
+    // project: 项目指令文件，必须是相对路径或 <default>
+    // <default> 展开为项目根目录的 AGENTS.md
+    "project": ["<default>"]
+  },
+
+  // === 工具名称列表 (toolNameList) ===
+  // 可选值：question, bash, read, glob, grep, edit, task, execute, webfetch, websearch, lsp, todowrite, skill
+  // 配置只接受 canonical edit；它同时控制宿主 edit、write 和 apply_patch。write 不是有效配置名。execute 是实验性 Code Mode，仅在宿主启用时出现。
+  "toolNameList": ["bash", "read", "glob", "grep", "edit", "task", "execute", "webfetch", "websearch", "lsp", "todowrite", "skill"]
+}

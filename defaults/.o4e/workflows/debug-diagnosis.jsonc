@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "debug-diagnosis",
+  "description": "Diagnose a reproducible failure directly.", "output": { "$from": "steps", "path": "/diagnose" },
+  "steps": [{ "id": "diagnose", "type": "work", "description": "Trace the reproduced failure to its root cause. Distinguish observations, hypotheses and decisive tests; do not edit before sufficient evidence." }]
+}

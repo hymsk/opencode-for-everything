@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "opencode-for-everything shared agent definitions",
+  "$defs": {
+    "modelId": { "type": "string", "minLength": 3, "pattern": "^[^/\\s]+/[^\\r\\n]+$" },
+    "modelVariant": { "type": "string", "minLength": 1, "pattern": "^[^\\r\\n]+$" },
+    "modelRef": {
+      "oneOf": [
+        { "$ref": "#/$defs/modelId" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "$ref": "#/$defs/modelId" },
+            "variant": { "$ref": "#/$defs/modelVariant" }
+          },
+          "required": ["id"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "nullableModelRef": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/modelRef" }]
+    },
+    "backgroundTasksConfig": {
+      "type": "object",
+      "properties": {
+        "maxRetries": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "agentName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "agentReferenceName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*(?: \\(plan\\))?$" },
+    "promptName": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*(?:[\\\\/][a-z0-9][a-z0-9-]*)*$" },
+    "nativeSystem": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/promptName" }
+    },
+    "absoluteInstructionFileList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "^(?:<default>$|/|[A-Za-z]:[\\\\/])" },
+      "uniqueItems": true
+    },
+    "relativeInstructionFileList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "^(?:<default>$|(?![\\\\/])(?!(?:.*[\\\\/])?\\.\\.(?:[\\\\/]|$)).+)$" },
+      "uniqueItems": true
+    },
+    "instructionFiles": {
+      "type": "object",
+      "properties": {
+        "global": { "$ref": "#/$defs/absoluteInstructionFileList" },
+        "project": { "$ref": "#/$defs/relativeInstructionFileList" }
+      },
+      "required": ["global", "project"],
+      "additionalProperties": false
+    },
+    "toolNameList": {
+      "type": "array",
+      "items": { "enum": ["question", "bash", "read", "glob", "grep", "edit", "task", "execute", "webfetch", "websearch", "lsp", "todowrite", "skill"] },
+      "uniqueItems": true
+    },
+    "nullableToolNameList": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/toolNameList" }
+      ]
+    },
+    "permissionAction": { "enum": ["allow", "ask", "deny"] },
+    "permissionName": {
+      "type": "string",
+      "minLength": 1,
+      "allOf": [
+        { "not": { "pattern": "^functions\\." } },
+        { "not": { "pattern": "^apply_patch$" } },
+        { "not": { "pattern": "^write$" } }
+      ]
+    },
+    "permissionRule": {
+      "oneOf": [
+        { "$ref": "#/$defs/permissionAction" },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/permissionAction" }
+        }
+      ]
+    },
+    "permissionConfig": {
+      "oneOf": [
+        { "$ref": "#/$defs/permissionAction" },
+        {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/permissionName" },
+          "additionalProperties": { "$ref": "#/$defs/permissionRule" }
+        }
+      ]
+    },
+    "loadableAgentNameList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?:\\*|[a-z0-9][a-z0-9-]*(?: \\(plan\\))?)$"
+      },
+      "uniqueItems": true
+    },
+    "loadableWorkflowNameList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(?:\\*|[a-z0-9][a-z0-9-]*)$"
+      },
+      "uniqueItems": true
+    },
+    "skillNameList": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+      "uniqueItems": true
+    },
+    "loadableSkillNameList": {
+      "oneOf": [
+        { "type": "array", "items": { "const": "*" }, "minItems": 1, "maxItems": 1 },
+        { "$ref": "#/$defs/skillNameList" }
+      ]
+    },
+    "capabilityList": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$" },
+      "uniqueItems": true
+    },
+    "planProfile": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["self", "child"], "description": "Both modes create only the lowercase <name> (plan) Profile name. self emits only that Profile; child also keeps the source Agent." },
+        "permission": { "$ref": "#/$defs/permissionConfig" },
+        "loadSkills": { "$ref": "#/$defs/loadableSkillNameList" },
+        "loadTools": { "$ref": "#/$defs/nullableToolNameList" },
+        "loadMcp": { "$ref": "#/$defs/mcpToolAccess" },
+        "loadAgents": { "$ref": "#/$defs/loadableAgentNameList" },
+        "loadWorkflows": { "$ref": "#/$defs/loadableWorkflowNameList" },
+        "blockSkills": { "$ref": "#/$defs/blockNameList" },
+        "blockTools": { "$ref": "#/$defs/toolNameList" },
+        "blockMcp": { "$ref": "#/$defs/blockNameList" },
+        "blockAgents": { "$ref": "#/$defs/blockNameList" },
+        "blockWorkflows": { "$ref": "#/$defs/blockNameList" },
+        "reminder": { "$ref": "#/$defs/promptName" }
+      },
+      "required": ["mode"],
+      "additionalProperties": false
+    },
+    "mcpToolAccess": {
+      "type": "object",
+      "propertyNames": { "pattern": "^(?:\\*|[A-Za-z0-9][A-Za-z0-9_-]*)$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "pattern": "^(?:\\*|[A-Za-z0-9][A-Za-z0-9_.:/-]*)$" },
+        "uniqueItems": true
+      }
+    },
+    "blockNameList": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(?:\\*|[A-Za-z0-9][A-Za-z0-9_.:/-]*)$" },
+      "uniqueItems": true
+    }
+  }
+}

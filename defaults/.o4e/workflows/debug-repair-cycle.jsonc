@@ -1,0 +1,8 @@
+{
+  "$schema": "../schemas/workflow.schema.json", "contract": "process-v1", "name": "debug-repair-cycle",
+  "description": "One explicit repair and validation pass; no automatic Loop.", "output": { "$from": "steps", "path": "/validate" },
+  "steps": [
+    { "id": "repair", "type": "work", "description": "Apply one authorized root-cause repair. This definition is not an automatic iteration loop.", "maxRepairRounds": 0 },
+    { "id": "validate", "type": "work", "dependsOn": ["repair"], "description": "Run regression validation, inspect the actual result and report remaining risks.", "gate": { "evidence": ["command-success"] }, "maxRepairRounds": 1 }
+  ]
+}

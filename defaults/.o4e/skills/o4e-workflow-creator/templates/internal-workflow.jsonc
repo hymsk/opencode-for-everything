@@ -1,0 +1,6 @@
+{
+  "$schema": "../../../schemas/workflow.schema.json",
+  "contract": "process-v1", "name": "reserved-process", "description": "Hidden definition; nested invocation is unsupported",
+  "visibility": "internal", "output": { "$from": "steps", "path": "/work" },
+  "steps": [{ "id": "work", "type": "work", "description": "This internal definition cannot be started or nested in process-v1." }]
+}
