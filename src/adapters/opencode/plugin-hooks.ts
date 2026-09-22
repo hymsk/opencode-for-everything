@@ -21,6 +21,7 @@ import { serial } from "../../runtime/serial.mjs"
 import { DelegationRuntime } from "../../runtime/delegation-runtime.mjs"
 import { BackgroundTaskRuntime } from "../../runtime/background-task-runtime.mjs"
 import { CommandTaskRuntime } from "../../runtime/command-task-runtime.mjs"
+import { CommandLedgerStore } from "../../runtime/command-ledger-store.mjs"
 import { createTaskReadBudget, validateTaskReadOptions, WATCH_MAX_TIMEOUT_MS } from "../../runtime/task-read-budget.mjs"
 import { validateTaskControlArgs } from "../../runtime/task-control-args.mjs"
 import { commandControlLines, inspectionText, previewLines, statusLine, watchTaskText } from "../../runtime/task-result-visibility.mjs"
@@ -1196,7 +1197,7 @@ function removePlanReminders(parts: any[]): void {
 }
 
 // Command options are dependency-injection seams, never model or O4E config fields.
-export async function createOpenCodeHooks({ client, directory, worktree, commandWaitOptions, commandLogOptions }: any) {
+export async function createOpenCodeHooks({ client, directory, worktree, commandWaitOptions, commandLogOptions, commandLedgerOptions }: any) {
   const o4eMode = resolveO4eMode()
   if (o4eMode === "origin") {
     return { config: async (config: any) => cleanDisabledAgentProjection(config, directory ?? worktree) }
@@ -1266,6 +1267,7 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
   const automaticTaskFollow = acquireAutomaticTaskFollow(sessionDirectory)
   const sharedTerminalContinuationSessions = terminalContinuationCoordination.sessions
   const sessionStore = new OpenCodeSessionStore(client, sessionDirectory)
+  const commandStore = new CommandLedgerStore(sessionStore, sessionDirectory, commandLedgerOptions)
   const scopeLocks = createSharedScopeLockManager(sessionDirectory)
   const hostAgentExecution = createOpenCodeAgentExecutionPort({ client, directory: sessionDirectory })
   const stopCommands = async (sessionID: string) => {
@@ -1317,7 +1319,7 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
     },
   }
   const commands = () => commandTaskRuntime ??= new CommandTaskRuntime({
-    store: sessionStore, directory: sessionDirectory,
+    store: commandStore, directory: sessionDirectory,
     limits: runtimeSnapshot()?.runtime.config.backgroundTasks,
     inspectionCursorResolver: resolveInspectionCursors,
     execution: {
@@ -1476,7 +1478,7 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
       if (!recovery) {
         recovery = (async () => {
           const current = session ?? await sessionStore.get(sessionID)
-          if (current?.metadata?.o4e?.commandTasks !== undefined) await commands().recoverSession({ sessionID })
+          if (current?.metadata?.o4e?.commandTasks !== undefined || await commandStore.hasOwner(sessionID)) await commands().recoverSession({ sessionID })
           await Promise.all([
           trackRuntimeOperation(() => backgroundTaskRuntime!.recoverSession(sessionID, { dispatch: false, session })),
           trackRuntimeOperation(() => delegationRuntime!.recoverSession(sessionID, { session })),
@@ -1678,6 +1680,7 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
     directory: sessionDirectory,
     snapshot: runtimeSnapshot,
     store: sessionStore,
+    commandStore,
     userTurnEpoch: (sessionID: string) => terminalContinuationCoordination.userTurnEpoch(sessionID),
   }) : undefined
   const continueParentSession = async (runtimeEvent: any, { terminalWakeup = false } = {}): Promise<"submitted" | "blocked" | "retry"> => {
@@ -1735,7 +1738,7 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
       return []
     }))
       .filter((task) => task.ownerSessionID === sessionID && !isTerminalTaskStatus(task.status))
-    const owner = terminalWakeup ? undefined : await sessionStore.get(sessionID)
+    const owner = terminalWakeup ? undefined : await commandStore.get(sessionID)
     const commandIDs = terminalWakeup || automaticTaskFollow.isSuppressed(sessionID) ? [] : Object.keys(sessionO4E(owner).commandTasks?.refs ?? {})
     const commandSelection = commandIDs.length > 0 ? await commands().watchSelection(commandIDs, { sessionID }) : undefined
     const commandTasks = commandSelection ? await commandSelection.tasks() : []
@@ -2380,7 +2383,7 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
       await wait(() => ensureRuntimeRecovery(context.sessionID))
       const snapshot = runtimeSnapshot()
       const agent = snapshot?.agentByName.get(context.agent)
-      const owner = await wait(() => sessionStore.get(context.sessionID))
+      const owner = await wait(() => commandStore.get(context.sessionID))
       const permission = agent ? effectiveAgentPermission(agent, {
         agents: snapshot!.agents, managedMcp: snapshot!.runtime.config.mcp,
       }) : undefined

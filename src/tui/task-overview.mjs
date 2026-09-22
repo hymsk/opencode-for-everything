@@ -40,7 +40,7 @@ function sameSnapshot(a, b, kind) {
 }
 
 function selectedRecord(kind, ref, owner, id, getSession) {
-  const saved = kind === "command" ? ref.recovery : ref.recoveryEnvelope?.version === 1 ? ref.recoveryEnvelope.task : undefined
+  const saved = kind === "command" ? ref.snapshot : ref.recoveryEnvelope?.version === 1 ? ref.recoveryEnvelope.task : undefined
   if (kind === "command") {
     // The owner may itself carry an Agent ledger. It is never this command's
     // execution Session, and its o4e.task must not participate in projection.
@@ -105,7 +105,7 @@ export function projectTaskOverview({ sessionID, getSession, limit = 6, offset =
   const groups = []
   for (const [kind, index, field] of [["command", o4e?.commandTasks, "refs"], ["agent", o4e?.backgroundTasks, "taskRefs"]]) {
     if (index === undefined) continue
-    if (!object(index) || index.version !== 1 || !object(index[field])) {
+    if (!object(index) || index.version !== (kind === "command" ? 2 : 1) || !object(index[field])) {
       groups.push({ kind, total: 0, allTotal: 0, hidden: 0, hiddenCompleted: 0, hiddenFailed: 0, hiddenTerminal: 0, invalid: 1, rows: [] })
       continue
     }

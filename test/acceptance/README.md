@@ -44,6 +44,14 @@ Task, and reads its watch/output. The bounded local provider allows up to 64
 requests per mode. The resulting Sessions can be opened in an isolated TUI for
 manual paging/details/navigation checks; CLI success alone is not visual proof.
 
+`--storage` includes `--cards` and adds output-heavy commands. After OpenCode
+exits, it reopens the actual Bun-written Command SQLite with Node SQLite and
+compares exact outputs and source identities against the host ToolParts. The
+report compares owner metadata bytes with the same records reconstructed in the
+prior full-recovery layout. This is a per-snapshot payload comparison, not an
+old/new A/B run or a measurement of total database/disk savings. Native Part
+output and refresh paths are not replaced. This harness requires Node.js 24.
+
 It builds fresh isolated targets and uses a bounded local fake provider. Its JSON
 ToolPart evidence does not establish real-model behavior, TUI visual rendering,
 full automatic-continuation lifecycle or cross-platform acceptance. The report

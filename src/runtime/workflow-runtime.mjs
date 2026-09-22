@@ -3,6 +3,7 @@ import { evaluate } from "../core/permission-rules.mjs"
 import { workflowHash } from "../core/workflow-definition.mjs"
 import { acceptProcessReport, assertProcess, beginProcess, newProcess, PROCESS_OWNER_RUN_LIMIT, processError, processSummary, processView, validateProcessArgs } from "../core/workflow-process.mjs"
 import { OpenCodeSessionStore, sessionO4E } from "./session-store.mjs"
+import { CommandLedgerStore } from "./command-ledger-store.mjs"
 import { withWorkflowRunLock } from "./workflow-coordination.mjs"
 import { canonicalDirectoryKey } from "./directory-key.mjs"
 import { discoverWorkflowEvidence, readWorkflowEvidence } from "../adapters/opencode/workflow-evidence.mjs"
@@ -32,12 +33,14 @@ const LIST_OUTPUT_BYTES = 48 * 1024
 // delegation, scheduling, cancellation, or side-effect replay belongs here.
 export class WorkflowRuntime {
   #store
+  #commandStore
   #snapshot
   #directory
   #userTurnEpoch
-  constructor({ client, directory, snapshot, store, userTurnEpoch = () => 0 }) {
+  constructor({ client, directory, snapshot, store, commandStore, userTurnEpoch = () => 0 }) {
     this.#directory = canonicalDirectoryKey(directory)
     this.#store = store ?? new OpenCodeSessionStore(client, this.#directory)
+    this.#commandStore = commandStore ?? new CommandLedgerStore(this.#store, this.#directory)
     this.#snapshot = snapshot
     this.#userTurnEpoch = userTurnEpoch
   }
@@ -166,7 +169,7 @@ export class WorkflowRuntime {
     for (const [id, state] of Object.entries(run.steps)) {
       if (state.status !== "passed" || !state.report.evidence.length) continue
       const submission = Object.values(run.submissions).find((item) => item.attemptID === state.attemptID)
-      const diagnostics = await readWorkflowEvidence({ store: this.#store,
+      const diagnostics = await readWorkflowEvidence({ store: this.#store, commandStore: this.#commandStore,
         context: { ...context, ...submission.source }, step: run.definition.steps.find((item) => item.id === id),
         attempt: state, evidence: state.report.evidence })
       if (diagnostics.length) throw processError("EVIDENCE_SOURCE_LOST")
@@ -233,7 +236,7 @@ export class WorkflowRuntime {
           const [stepID, attempt] = active
           const step = run.definition.steps.find((item) => item.id === stepID)
           availableEvidence = { stepID, attemptID: attempt.attemptID,
-            ...await discoverWorkflowEvidence({ store: this.#store, context, step, attempt }) }
+            ...await discoverWorkflowEvidence({ store: this.#store, commandStore: this.#commandStore, context, step, attempt }) }
           // Discovery is read-only, but source I/O must not bypass a permission
           // change or publish references for a checkpoint changed while reading.
           const latest = await this.#owner(context, name)
@@ -267,7 +270,7 @@ export class WorkflowRuntime {
         const state = run.steps[args.stepID]
         if (state?.status !== "active" || state.attemptID !== args.attemptID) throw processError("ATTEMPT_MISMATCH")
         const step = run.definition.steps.find((item) => item.id === args.stepID)
-        const diagnostics = await readWorkflowEvidence({ store: this.#store, context, step, attempt: state, evidence: args.report.evidence })
+        const diagnostics = await readWorkflowEvidence({ store: this.#store, commandStore: this.#commandStore, context, step, attempt: state, evidence: args.report.evidence })
         // A newly persisted user turn during evidence I/O invalidates promotion.
         if (await this.#boundary(context) !== boundary) throw processError("NEW_USER_MESSAGE")
         decision = acceptProcessReport(run, args, diagnostics, boundary, source(context))

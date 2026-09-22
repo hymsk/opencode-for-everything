@@ -12,6 +12,8 @@ import { OpenCodeForEverythingPlugin } from "../src/plugin.ts"
 import { createSharedScopeLockManager } from "../src/runtime/scope-locks.mjs"
 import { createSharedBackgroundTaskScheduler } from "../src/runtime/background-task-scheduler.mjs"
 import { copyInstalledDefaults } from "./helpers/o4e-fixture.mjs"
+import { DatabaseSync } from "node:sqlite"
+import { commandLedgerPath } from "../src/runtime/command-ledger-store.mjs"
 
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const options = { timeout: 30000 }
@@ -242,6 +244,19 @@ async function fixture(t, { buildPermission = {}, shell = "/bin/bash", maxConcur
   for (const [id, agent] of [["native", "build"], ["other", "build"], ["plan", "plan"], ["parent", "orchestrator"]]) f.client.addSession({ id, agent })
   f.facade = async () => {
     const facade = await OpenCodeForEverythingPlugin({ client: f.client, directory, worktree: activeWorktree,
+      commandLedgerOptions: { root: join(root, "ledger"), connect: (path) => {
+        const db = new DatabaseSync(path)
+        const prepare = db.prepare.bind(db)
+        db.prepare = (sql) => {
+          const statement = prepare(sql)
+          if (sql.startsWith("INSERT INTO commands")) {
+            const run = statement.run.bind(statement)
+            statement.run = (...args) => { f.beforeLedgerWrite?.(args[0], JSON.parse(args[3])); return run(...args) }
+          }
+          return statement
+        }
+        return db
+      } },
       commandWaitOptions, commandLogOptions: { logRoot: join(root, "logs"), ...commandLogOptions } })
     facades.add(facade)
     await facade.config(f.hostConfig)
@@ -332,7 +347,13 @@ async function fixture(t, { buildPermission = {}, shell = "/bin/bash", maxConcur
   }
   f.bash = (command, context, extra = {}) => f.json("bash", { command, description: "command integration fixture", timeout: 5000, ...extra }, context)
   f.read = (taskID, action = "status", context, extra = {}) => f.json("o4e_task", { action, taskID, ...extra }, context)
-  f.refs = (owner = "native") => f.client.sessions.get(owner)?.metadata?.o4e?.commandTasks?.refs ?? {}
+  f.refs = (owner = "native") => {
+    const path = commandLedgerPath(directory, join(root, "ledger"))
+    if (!existsSync(path)) return {}
+    const db = new DatabaseSync(path, { readOnly: true })
+    try { return Object.fromEntries(db.prepare("SELECT id,ref FROM commands WHERE owner=?").all(owner).map((row) => [row.id, JSON.parse(row.ref)])) }
+    finally { db.close() }
+  }
   f.record = (taskID, owner = "native") => f.refs(owner)[taskID]?.recovery
   f.running = (owner = "native") => Object.values(f.refs(owner)).find((ref) => ref.recovery.status === "running")?.recovery
   f.noDispatch = () => {
@@ -613,15 +634,9 @@ test("background log finalization failure is model-visible through every output 
   assert.equal(f.active(running.taskID), false, "log failure does not erase verified process stop")
 })
 
-test("Bash terminal owner persistence failure exposes diagnostic and retains the command slot", options, async (t) => {
+test("Bash terminal SQLite persistence failure exposes diagnostic and retains the command slot", options, async (t) => {
   const f = await fixture(t)
-  const update = f.client.session.update
-  f.client.session.update = async (args) => {
-    const o4e = args.body.metadata?.o4e
-    const terminalWrite = Object.values(o4e?.commandTasks?.refs ?? {}).some((ref) => ref.recovery.status === "completed")
-    if (terminalWrite) throw new Error("terminal store unavailable")
-    return update(args)
-  }
+  f.beforeLedgerWrite = (_owner, ref) => { if (ref.recovery.status === "completed") throw new Error("terminal SQLite unavailable") }
   try {
     const result = await f.invoke("bash", { command: "printf OK", description: "failed settlement" }, f.context())
     const snapshot = result.metadata.o4eResult
@@ -632,7 +647,7 @@ test("Bash terminal owner persistence failure exposes diagnostic and retains the
     assert.equal(result.metadata.output, "OK", "the native Shell card retains captured text")
     assert.equal(f.active(snapshot.taskID), true)
     assert.deepEqual(liveProcesses(f.root), [])
-  } finally { f.client.session.update = update }
+  } finally { f.beforeLedgerWrite = undefined }
 })
 
 test("command watch and status show state while every output call returns exact captured text", options, async (t) => {
@@ -1291,13 +1306,11 @@ test("unconfirmed child command persistence retains its Agent lock but cannot bl
   const parent = await f.general()
   const child = await f.bash("sleep 5", f.context({ sessionID: parent.sessionID, approvals: ["bash:sleep 5"] }))
   assert.equal(child.status, "running")
-  const update = f.client.session.update
   try {
-    f.client.session.update = async (args) => {
-      if (args.path.id === parent.sessionID && args.body.metadata?.o4e?.commandTasks?.refs?.[child.taskID]?.recovery.stopped) {
+    f.beforeLedgerWrite = (owner, ref) => {
+      if (owner === parent.sessionID && ref.recovery.taskID === child.taskID && ref.recovery.stopped) {
         throw new Error("child command stop persistence unavailable")
       }
-      return update(args)
     }
     await Promise.allSettled([f.read(parent.taskID, "cancel", f.context({ sessionID: "parent" }))])
     await until(() => liveProcesses(f.root).length === 0)
@@ -1308,7 +1321,7 @@ test("unconfirmed child command persistence retains its Agent lock but cannot bl
     assert.notEqual(root.status, "queued")
     await until(() => f.record(root.taskID).status === "completed")
     assert.equal(existsSync(join(f.directory, "independent-root.txt")), true)
-  } finally { f.client.session.update = update }
+  } finally { f.beforeLedgerWrite = undefined }
   await f.read(parent.taskID, "cancel", f.context({ sessionID: "parent" }))
   await f.hooks.event({ event: { type: "session.idle", properties: { sessionID: parent.sessionID } } })
   await until(() => !f.locks.has(`background-task:${parent.taskID}`))
@@ -1365,6 +1378,7 @@ test("external-directory gates file arguments and workdir with explicit host app
 test("the original Bash abort signal cancels a queued command before a resource slot becomes available", options, async (t) => {
   const f = await fixture(t, { maxConcurrentCommands: 1, commandWaitOptions: { runningTimeoutMs: 20 } })
   const blocker = await f.bash("sleep 5")
+  await until(() => f.record(blocker.taskID).status === "running")
   const controller = new AbortController()
   const rejected = assert.rejects(f.bash("touch queued-probe.txt", f.context({ controller })), /cancel queued Bash/)
   await until(() => Object.values(f.refs()).some((ref) => ref.recovery.status === "queued"))
@@ -1380,6 +1394,7 @@ test("the original Bash abort signal cancels a queued command before a resource 
   // 终态 completed（栅栏未被取消破坏），不是同步返回快照的瞬时相位。
   if (writer.status !== "completed") await until(() => f.record(writer.taskID).status === "completed")
   assert.equal(f.record(writer.taskID).status, "completed", "the cancelled queue must remain fenced after a later writer is admitted")
+  assert.equal(f.record(writer.taskID).result.output, "OK", "terminal output must be recorded in the command ledger")
   const final = await f.read(queued.taskID)
   assert.equal(final.status, "cancelled")
   assert.equal(final.phase, "not-submitted")
@@ -1693,27 +1708,54 @@ test("disposing a reader facade does not cancel the creator facade's shared live
   f.noDispatch()
 })
 
-test("dispose retries failed owner persistence without respawning its stopped command", options, async (t) => {
+test("host summary failure preserves output and permits confirmed cancel/dispose; recovery repairs cards index", options, async (t) => {
+  const f = await fixture(t, { commandWaitOptions: { runningTimeoutMs: 30 } })
+  const update = f.client.session.update
+  f.client.session.update = async () => { throw new Error("fixture summary unavailable") }
+  try {
+    const first = await f.bash("printf OK")
+    await until(() => f.record(first.taskID)?.status === "completed")
+    const status = await f.json("o4e_task", { action: "status", taskID: first.taskID })
+    assert.equal(status.diagnostic, "O4E_COMMAND_PROJECTION_UNAVAILABLE")
+    assert.equal(f.record(first.taskID).result.output, "OK")
+    const second = await f.bash("sleep 20")
+    await until(() => f.record(second.taskID)?.status === "running")
+    await f.json("o4e_task", { action: "cancel", taskID: second.taskID })
+    assert.equal(f.record(second.taskID).stopped, true)
+    assert.equal(f.active(second.taskID), false)
+    const third = await f.bash("sleep 20")
+    await until(() => f.record(third.taskID)?.status === "running")
+    await bounded(f.hooks.dispose())
+    assert.equal(f.record(third.taskID).stopped, true)
+    assert.equal(f.active(third.taskID), false)
+    assert.deepEqual(liveProcesses(f.root), [])
+  } finally { f.client.session.update = update }
+  const reader = await f.facade()
+  const taskID = Object.keys(f.refs())[0]
+  const repaired = await f.json("o4e_task", { action: "status", taskID }, undefined, reader)
+  assert.equal(repaired.diagnostic, undefined)
+  assert.equal(Object.keys(f.client.sessions.get("native").metadata.o4e.commandTasks.refs).length, 3)
+})
+
+test("dispose retries failed SQLite persistence without respawning its stopped command", options, async (t) => {
   const f = await fixture(t)
   const command = "printf OK >> dispose-once.txt; sleep 2; touch dispose-retry-later.txt"
   const bashSettled = Promise.allSettled([f.bash(command, f.context({ approvals: ["bash:printf OK >> dispose-once.txt"] }))])
   await until(() => f.running() && existsSync(join(f.directory, "dispose-once.txt")) && liveProcesses(f.root).length > 0)
   const started = structuredClone(f.running())
   const taskID = started.taskID
-  const update = f.client.session.update
   const storeError = new Error("fixture owner update unavailable")
   const failedWrites = []
   try {
-    f.client.session.update = async (args) => {
-      if (args.path.id === "native") {
-        failedWrites.push(structuredClone(args.body))
+    f.beforeLedgerWrite = (owner, ref) => {
+      if (owner === "native") {
+        failedWrites.push(structuredClone(ref))
         throw storeError
       }
-      return update(args)
     }
-    await assert.rejects(bounded(f.hooks.dispose(), 1200), (error) => error === storeError)
+    await assert.rejects(bounded(f.hooks.dispose(), 1200), /O4E_COMMAND_STORAGE_UNAVAILABLE/)
     await bounded(bashSettled, 1000)
-    assert.ok(failedWrites.some((body) => body.metadata?.o4e?.commandTasks?.refs?.[taskID]?.recovery.stopped === true))
+    assert.ok(failedWrites.some((ref) => ref.recovery.stopped === true))
     assert.deepEqual(liveProcesses(f.root), [], "failed disposal must already have stopped the real process")
     assert.equal(f.record(taskID).status, "running")
     assert.equal(f.record(taskID).stopped, false)
@@ -1721,7 +1763,7 @@ test("dispose retries failed owner persistence without respawning its stopped co
     assert.equal(f.active(taskID), true, "process stop without confirmed owner persistence cannot release the resource slot")
     assert.equal(readFileSync(join(f.directory, "dispose-once.txt"), "utf8"), "OK")
     assert.equal(existsSync(join(f.directory, "dispose-retry-later.txt")), false)
-  } finally { f.client.session.update = update }
+  } finally { f.beforeLedgerWrite = undefined }
 
   await bounded(f.hooks.dispose(), 1200)
   const record = f.record(taskID)
@@ -1749,19 +1791,15 @@ test("failed plugin dispose rolls Bash admission back instead of leaving the fac
   const bashSettled = Promise.allSettled([f.bash(command, f.context({ approvals: ["bash:printf OK >> dispose-rollback-once.txt"] }))])
   await until(() => f.running() && existsSync(join(f.directory, "dispose-rollback-once.txt")) && liveProcesses(f.root).length > 0)
   const taskID = f.running().taskID
-  const update = f.client.session.update
   const storeError = new Error("fixture rollback owner update unavailable")
   try {
-    f.client.session.update = async (args) => {
-      if (args.path.id === "native") throw storeError
-      return update(args)
-    }
-    await assert.rejects(bounded(f.hooks.dispose(), 1200), (error) => error === storeError)
+    f.beforeLedgerWrite = (owner) => { if (owner === "native") throw storeError }
+    await assert.rejects(bounded(f.hooks.dispose(), 1200), /O4E_COMMAND_STORAGE_UNAVAILABLE/)
     await bounded(bashSettled, 1000)
     assert.deepEqual(liveProcesses(f.root), [])
     assert.equal(f.record(taskID).status, "running")
     assert.equal(f.active(taskID), true)
-  } finally { f.client.session.update = update }
+  } finally { f.beforeLedgerWrite = undefined }
 
   const afterRollback = await f.bash("touch after-failed-dispose.txt")
   assert.equal(afterRollback.status, "queued")

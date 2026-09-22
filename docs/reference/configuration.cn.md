@@ -469,8 +469,8 @@ OpenCode `directory` 是活动工作目录，`worktree` 是仓库/项目规则�
 3. Bash 不获取、借用或恢复执行 Scope Lock，不因可写 Agent 或其他 Bash 的写范围而排队。
     Child 仍须具备可信冻结的 `unknown-write` 权限，不接受模型指定 owner，不升级 read/scoped authority。
     Agent 之间的写锁、父子生命周期及停止确认不变；并发修改同一文件的冲突与命令依赖顺序由调用方协调。
-4. 按 owner/kind command lane 准入，canonical ledger 和 owner index 都持久化
-   execution claim 后才调用 port。Admission 等待默认 1000 毫秒，开始 running 后
+4. 按 owner/kind command lane 准入，独立 SQLite 事务确认 canonical record 与
+   execution claim 后才调用 port；宿主展示摘要独立发布。Admission 等待默认 1000 毫秒，开始 running 后
    另有默认 10000 毫秒窗口；到期仍 queued/running 时返回快照与稳定 command
    `taskID`，命令继续执行。两个窗口均与默认 120000 毫秒 execution timeout 分离，
    也不是授权/持久化的端到端时限。
@@ -503,14 +503,22 @@ Tail 随输出增长；inspect 预览和 watch heartbeat 均不表示命令完�
 
 ### Ledger、输出与取消
 
-Command 的独立 `kind: command` ledger 保存在 owner Session 的
-`metadata.o4e.commandTasks.refs[taskID].recovery`；这是唯一规范记录，不使用 Agent
-normalizer，也不覆盖 owner 的 `metadata.o4e.task` 或 delegation envelope。
+Command 的独立 `kind: command` ledger 按目录、owner、task 保存在 O4E 私有 SQLite 中；
+它是唯一规范记录，不使用 Agent normalizer，也不覆盖 owner 的 Agent 账本或 delegation envelope。
+Session 的 `metadata.o4e.commandTasks` 为 version 2，只保存白名单 `snapshot` 展示摘要。
+恢复、输出读取和 Workflow Gate 从 SQLite 读取完整有界记录，不依赖展示副本。
 不另建 Command Session，因此新命令不会增加普通 Session 列表或 Ctrl+x 子 agent 导航项。
 `taskSessionID` 等于 `ownerSessionID`，仅表示存储容器，不是可导航的执行会话。
 来源 Session/message/call 身份去重，命令与说明正文留在宿主 Bash Part，ledger 保存引用/hash
-而非可重放输入。记录与引用在一次 owner 更新中提交，claim 确认后才执行。
-不扫描、迁移或删除历史 Command Session；不符合当前布局的记录拒绝继续处理。
+而非可重放输入。记录、来源索引和 claim 在一次 SQLite 事务中提交，确认后才执行。
+不扫描、迁移或删除历史 Command Session 或旧 recovery；不符合当前布局的记录拒绝继续处理。
+SQLite 默认位于用户数据目录的 `opencode-for-everything/command-ledgers/<directory-sha256>.sqlite`。
+Linux/macOS 使用 `XDG_DATA_HOME`（缺省 `~/.local/share`），Windows 使用 `LOCALAPPDATA`
+（缺省 `~/AppData/Local`）。POSIX 私有目录 0700、数据库 0600；没有用户可配置的数据库路径字段。
+任务记录不按日志的 24 小时 TTL 删除。备份或迁移机器时须同时保留该数据库和宿主会话数据；
+安装、构建、卸载不会自动删除它。目录移动会选择不同目录标识，不能保证自动恢复。
+数据库缺失或不可读时拒绝恢复，不能从摘要重建；宿主摘要发布失败只产生
+`O4E_COMMAND_PROJECTION_UNAVAILABLE`，后续指定 owner 的恢复可重新发布。
 恢复只处理指定 owner，先恢复不确定 Command admission，不创建写锁，
 再查询 handle；可重接进程内现有 handle，不重新执行旧 claim，
 不跨宿主重启收养 PID，也不按用户消息重建旧命令。已无 live launch 的未提交记录进入

@@ -4978,6 +4978,7 @@ export class BackgroundTaskRuntime {
       const group = normalizeTaskGroupMetadata(state.backgroundTasks)
       const ref = group.taskRefs[task.record.taskID]
       if (!ref) throw new Error(`父 Session 缺少 Task 索引: ${task.record.taskID}`)
+      if (ref.cancellationRequestedAt !== undefined) return state
       return {
         ...state,
         backgroundTasks: {

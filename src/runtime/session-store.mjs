@@ -1,5 +1,6 @@
 import { canonicalDirectoryKey } from "./directory-key.mjs"
 import { serial } from "./serial.mjs"
+import { isDeepStrictEqual } from "node:util"
 
 export const O4E_METADATA_KEY = "o4e"
 const RECOVERY_SESSION_LIMIT = 100_000
@@ -158,6 +159,9 @@ export class OpenCodeSessionStore {
         ? metadata[O4E_METADATA_KEY]
         : {}
       const nextO4E = transform(structuredClone(o4e), current)
+      // Run the transform (including authority/CAS checks) against fresh state
+      // before suppressing an identical host snapshot. Never cache Session reads.
+      if (isDeepStrictEqual(nextO4E, o4e)) return current
       return unwrap(await this.#client.session.update({
         path: { id: sessionID },
         query: { directory: this.#directory },

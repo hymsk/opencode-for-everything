@@ -126,7 +126,7 @@ test("task list arrow keys page within the focused panel and clamp against curre
   dispose(); assert.equal(disposed, true)
 })
 function fixture() {
-  const owner = { id: "owner", metadata: { o4e: { backgroundTasks: { version: 1, taskRefs: {} }, commandTasks: { version: 1, refs: {} } } } }
+  const owner = { id: "owner", metadata: { o4e: { backgroundTasks: { version: 1, taskRefs: {} }, commandTasks: { version: 2, refs: {} } } } }
   const sessions = new Map([[owner.id, owner]])
   const reads = []
   function add(kind, status, n, extra = {}) {
@@ -144,7 +144,7 @@ function fixture() {
       record.source ??= { sessionID: owner.id, messageID: `message-${n}`, callID: `call-${n}` }
       record.claim = "claim"
       owner.metadata.o4e.commandTasks.refs[taskID] = { taskSessionID, claim: record.claim,
-        callKey: createHash("sha256").update(JSON.stringify([record.source.sessionID, record.source.messageID, record.source.callID])).digest("hex"), recovery: record }
+        callKey: createHash("sha256").update(JSON.stringify([record.source.sessionID, record.source.messageID, record.source.callID])).digest("hex"), snapshot: record }
     }
     return record
   }
@@ -334,7 +334,7 @@ for (const kind of ["command", "agent"]) test(`${kind} sidebar filters only veri
   statuses.forEach((status, index) => f.add(kind, status, index + 1))
   if (kind === "command") {
     const ref = f.owner.metadata.o4e.commandTasks.refs[id(kind, 10)]
-    Object.assign(ref.recovery, { phase: "not-submitted", stopped: true, claim: null })
+    Object.assign(ref.snapshot, { phase: "not-submitted", stopped: true, claim: null })
     ref.claim = null
   }
   for (let n = 20; n < 45; n++) f.add(kind, "completed", n)
@@ -373,7 +373,7 @@ test("sidebar completed counts react to completion, new generations and owner ch
   Object.assign(active, structuredClone(saved), { revision: 3 })
   assert.equal(view().groups[1].total, 0)
   assert.equal(projectTaskOverview({ ...options, hideCompleted: false, taskID: saved.taskID }).groups[1].rows[0].status, "completed")
-  const other = { id: "other", metadata: { o4e: { commandTasks: { version: 1, refs: {} } } } }
+  const other = { id: "other", metadata: { o4e: { commandTasks: { version: 2, refs: {} } } } }
   f.sessions.set(other.id, other)
   assert.ok(projectTaskOverview({ ...options, sessionID: "other" }).groups.every((g) => !g.total && !g.hiddenCompleted && !g.invalid))
   f.owner.metadata.o4e.backgroundTasks.version = 999
@@ -405,7 +405,7 @@ test("compact cards omit verified terminal states but keep uncertain work and al
     for (const [index, status] of ["failed", "completed", "running", "waiting_permission", "unknown", "cancelled", "cancelling", "interrupted"].entries()) f.add(kind, status, index + 1)
     if (kind === "command") {
       const ref = f.owner.metadata.o4e.commandTasks.refs[id(kind, 8)]
-      Object.assign(ref.recovery, { phase: "not-submitted", stopped: true, claim: null })
+      Object.assign(ref.snapshot, { phase: "not-submitted", stopped: true, claim: null })
       ref.claim = null
     }
     const options = { sessionID: "owner", getSession: (id) => f.sessions.get(id) }

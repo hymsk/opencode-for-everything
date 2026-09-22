@@ -81,7 +81,7 @@ Agent Task 的所有模型错误都会保留原因并进入 `waiting_retry_decis
 
 权限解析只提取可可靠识别的资源，不对白名单语法做限制；命令原文交给目标 Host Shell，因此由目标 Shell 处理引号、展开、赋值、循环、函数、脚本和重定向。静态可确定的路径会交给宿主权限检查，动态路径不会被猜测展开；这些检查不是 sandbox。
 
-Bash 不获取、借用或恢复执行 Scope Lock，不与可写 Agent 或其他 Bash 因写范围互斥。Command Task 使用独立的 owner/kind lane 和 `maxConcurrentCommands`（默认 4），不占 Agent 并发槽；并发修改同一文件和命令依赖顺序由调用方协调。Command ledger 和 owner index 在 claim 后持久化、执行前确认；进程重载只重接同一进程内仍存在的 handle，不跨宿主重启收养 PID，也不重执行旧 claim。Agent 的 Effect 推导与 Agent 之间的写锁不变。
+Bash 不获取、借用或恢复执行 Scope Lock，不与可写 Agent 或其他 Bash 因写范围互斥。Command Task 使用独立的 owner/kind lane 和 `maxConcurrentCommands`（默认 4），不占 Agent 并发槽；并发修改同一文件和命令依赖顺序由调用方协调。Command ledger 和来源索引在独立 SQLite 事务中持久化，claim 在执行前确认；宿主展示摘要另行发布；进程重载只重接同一进程内仍存在的 handle，不跨宿主重启收养 PID，也不重执行旧 claim。Agent 的 Effect 推导与 Agent 之间的写锁不变。
 
 ### 等待窗口与状态管理
 
@@ -158,7 +158,7 @@ CLI 当前只接受显式子命令 `install/uninstall/status/build/export/import
 | Agent 配置 | 宿主提供 Agent、Session、模型和工具生命周期 | `.o4e` 提供角色目录、Prompt、Skill、Soul、原生 Agent 三态投影 |
 | `task` | 宿主 builtin task 负责原生子 Agent 调用和权限流程 | 同名受管 adapter 成为唯一委派入口，默认后台、稳定 `taskID`、深度和父链约束 |
 | `bash` | 宿主提供普通 Shell 工具、权限和 Shell 卡片 | 受管 Bash 直接进入 Command Runtime，增加 owner ledger、资源并发上限、独立等待窗口、tail/日志和取消边界，不增加执行写锁 |
-| Session | 宿主保存消息、Parts、busy/idle 和原生 permission/question | O4E 在 Session metadata 中保存 Agent/Command Task ledger；Workflow 只保存 owner 检查点，不建后台 ledger |
+| Session | 宿主保存消息、Parts、busy/idle 和原生 permission/question | O4E 在 Session metadata 中保存 Agent ledger 和 Command 展示摘要，Command 规范账本保存在独立 SQLite；Workflow 只保存 owner 检查点，不建后台 ledger |
 | 权限 | 宿主 `allow/ask/deny` 与 `context.ask` 是最终执行门 | O4E 先做角色、目标、Overlay、Effect/Scope 和 owner 校验，再请求宿主确认；O4E 不用 `allow` 绕过宿主 `ask` |
 | 输出 | 宿主负责 Tool Part、Shell 卡片和模型响应展示，可能折叠或裁剪 | O4E 保留捕获文本、明示退出/截断/日志不完整，并把 `watch/status` 与 `output` 分离 |
 | 交互输入 | 宿主 prompt API 接受消息和 delivery 选项 | O4E 默认 durable next-turn；`steer` 只有宿主确认 admission 才报告成功，不承诺即时 token 中断 |

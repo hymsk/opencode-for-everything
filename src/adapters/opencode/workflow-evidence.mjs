@@ -39,17 +39,17 @@ function verifiedAgentReference(ownerSession, ref, task, envelope, context) {
 
 // Read-only evidence: never invokes Task recovery, dispatch, watch, output,
 // cancellation or receipt consumption. Missing/truncated references fail closed.
-export async function readWorkflowEvidence({ store, context, step, attempt, evidence }) {
+export async function readWorkflowEvidence({ store, commandStore, context, step, attempt, evidence }) {
   if (!evidence.length) return []
   const messages = await store.messages(context.sessionID)
   const ownerSession = await store.get(context.sessionID)
-  return verifyEvidence({ store, context, step, attempt, evidence, messages, ownerSession })
+  return verifyEvidence({ store, commandStore, context, step, attempt, evidence, messages, ownerSession })
 }
 
 // Reference discovery uses the same verifier as Gate acceptance. IDs come only
 // from completed owner ToolParts, never from prose or a model-supplied locator.
 // No output is returned and no Task operation, recovery or receipt is invoked.
-export async function discoverWorkflowEvidence({ store, context, step, attempt }) {
+export async function discoverWorkflowEvidence({ store, commandStore, context, step, attempt }) {
   const messages = await store.messages(context.sessionID)
   const ownerSession = await store.get(context.sessionID)
   const references = []
@@ -65,19 +65,19 @@ export async function discoverWorkflowEvidence({ store, context, step, attempt }
       const taskID = part.state.metadata?.o4eResult?.taskID
       const kind = part.tool === "task" ? "task-created" : part.tool === "bash" ? "command-success"
         : part.tool === "o4e_task" && part.state.input?.action === "output"
-          ? Object.hasOwn(sessionO4E(ownerSession).commandTasks?.refs ?? {}, taskID) ? "command-success" : "task-result" : undefined
+          ? typeof taskID === "string" && taskID.startsWith("o4e_command_") ? "command-success" : "task-result" : undefined
       if (!kind) continue
       const item = { kind, taskID, messageID: message.info?.id, callID: part.callID }
       try { validateStepReport({ status: "reported-completed", output: null, artifacts: [], evidence: [item], diagnostics: [] }) }
       catch { continue }
       candidates++
-      if (!(await verifyEvidence({ store, context, step, attempt, evidence: [item], messages, ownerSession })).length) references.push(item)
+      if (!(await verifyEvidence({ store, commandStore, context, step, attempt, evidence: [item], messages, ownerSession })).length) references.push(item)
     }
   }
   return { references, limited, next: "Copy applicable references into report.evidence; report revalidates sources and Gate requirements. Empty or limited discovery is not proof. Do not rerun side effects to obtain IDs." }
 }
 
-async function verifyEvidence({ store, context, step, attempt, evidence, messages, ownerSession }) {
+async function verifyEvidence({ store, commandStore, context, step, attempt, evidence, messages, ownerSession }) {
   const diagnostics = []
   const current = messages.find((message) => message.info?.id === context.messageID)
   const begin = messages.find((message) => message.info?.id === attempt.source.messageID)
@@ -115,9 +115,10 @@ async function verifyEvidence({ store, context, step, attempt, evidence, message
          || !hasUnmodifiedToolOutput(part.state)) throw new Error()
       const modelOutput = modelTaskPart(part).state.output
       if (item.kind === "command-success") {
-        const ref = owner.commandTasks?.refs?.[item.taskID]
+        const canonicalOwner = sessionO4E(await commandStore.get(context.sessionID))
+        const ref = canonicalOwner.commandTasks?.refs?.[item.taskID]
         const record = ref?.recovery
-        if (ownerSession?.id !== context.sessionID || owner.commandTasks?.version !== 1 || ref?.taskSessionID !== context.sessionID
+        if (ownerSession?.id !== context.sessionID || canonicalOwner.commandTasks?.version !== 1 || ref?.taskSessionID !== context.sessionID
           || record?.kind !== "command" || record.version !== 1 || record.taskID !== item.taskID || record.taskSessionID !== context.sessionID
           || record.ownerSessionID !== context.sessionID || record.requesterAgent !== context.agent
           || !Number.isSafeInteger(record.revision) || record.revision < 1

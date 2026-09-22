@@ -291,6 +291,7 @@ test("default watch monitors Agent and Bash together, deduplicates command state
   client.directory = target
   client.addSession({ id: "parent", directory: target, status: "busy" })
   hooks = await OpenCodeForEverythingPlugin({ client, directory: target, worktree: target,
+    commandLedgerOptions: { root: join(target, "ledger") },
     commandWaitOptions: { runningTimeoutMs: 20, timeoutMs: 10 } })
   const agent = await executeTask(hooks, {
     description: "independent reader", prompt: "wait for the fixture", subagent_type: "researcher (plan)", writeScopes: [],

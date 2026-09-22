@@ -201,7 +201,7 @@ owner idle 和根回合的 `MessageAbortedError`/`AbortError` 也不取消执行
 停止状态，而不是仅中止根对话；后台运行不提供跨宿主重启的常驻服务。
 重载只可重接进程内 handle，不重执行旧 claim：未提交且没有 live launch 的记录
 进入 `interrupted/not-submitted`，已 claim 但 handle 丢失时保持 `unknown` 和 Command 资源槽位。
-取消停止未确认或 canonical/owner 持久化失败时同样保留 admission 与不确定记录；不要手改 ledger
+取消停止未确认或 canonical SQLite 持久化失败时同样保留 admission 与不确定记录；不要手改 ledger
 释放槽位或自动重新执行。重试取消或 disposal 只重试停止证据/持久化，不会启动替代命令。
 
 内存视图最多 64 KiB，inspect 只分页该视图。Bash 模型正文另限 48 KiB/1800 行，超限

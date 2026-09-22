@@ -34,6 +34,7 @@ function fixture(t, value = definition(), { plugin = false } = {}) {
   const sessions = new Map([["owner", { id: "owner", directory, agent: "orchestrator", metadata: {} }],
     ["foreign", { id: "foreign", directory, agent: "orchestrator", metadata: {} }]])
   const messages = new Map([["owner", []], ["foreign", []]])
+  const commandSessions = new Map()
   let sequence = 0
   let writes = 0
   let failWrite = false
@@ -64,7 +65,8 @@ function fixture(t, value = definition(), { plugin = false } = {}) {
   const store = new OpenCodeSessionStore(client, directory)
   const updateO4E = store.updateO4E.bind(store)
   store.updateO4E = async (...args) => { await beforeUpdate?.(); return updateO4E(...args) }
-  const runtime = () => new WorkflowRuntime({ store, directory, snapshot: () => snapshot, userTurnEpoch: () => epoch })
+  const commandStore = { get: async (owner) => structuredClone(commandSessions.get(owner)) }
+  const runtime = () => new WorkflowRuntime({ store, commandStore, directory, snapshot: () => snapshot, userTurnEpoch: () => epoch })
   const user = (id = `user-${++sequence}`, sessionID = "owner") => {
     epoch++
     messages.get(sessionID).push({ info: { id, sessionID, role: "user", time: { created: ++sequence } }, parts: [{ id: `p-${id}`, type: "text", text: "user instruction" }] })
@@ -89,7 +91,7 @@ function fixture(t, value = definition(), { plugin = false } = {}) {
     messages.get("owner").push({ info: { id, sessionID: "owner", role: "assistant", time: { created: sequence } }, parts: [part] })
     return { messageID: id, callID, part }
   }
-  const f = { directory, client, store, snapshot, sessions, messages, reads, runtime, context, user, toolPart,
+  const f = { directory, client, store, snapshot, sessions, commandSessions, messages, reads, runtime, context, user, toolPart,
     get writes() { return writes }, get creates() { return creates }, get prompts() { return prompts }, get asks() { return asks },
     set failWrite(value) { failWrite = value }, set loseResponse(value) { loseResponse = value },
     set beforeUpdate(value) { beforeUpdate = value },
@@ -596,7 +598,7 @@ test("explicit null input remains null, dependency mapping uses only accepted ou
 })
 
 test("command-success verifies canonical owner/source/result and rejects corruption or incomplete capture", async (t) => {
-  for (const mutation of ["valid", "exit", "foreign", "command", "truncated", "log", "index", "claim", "legacy-layout", "model-output", "synthetic", "private", "ignored", "summary", "visibility", "compacted"]) await t.test(mutation, async (t) => {
+  for (const mutation of ["valid", "missing-canonical", "exit", "foreign", "command", "truncated", "log", "index", "claim", "legacy-layout", "model-output", "synthetic", "private", "ignored", "summary", "visibility", "compacted"]) await t.test(mutation, async (t) => {
     const f = fixture(t, definition([{ id: "work", type: "work", gate: { evidence: ["command-success"] } }]))
     let run = await f.call({ action: "start", workflow: "investigation" })
     run = await f.call({ action: "begin", runID: run.runID, stepID: "work", expectedRevision: 1 })
@@ -618,7 +620,14 @@ test("command-success verifies canonical owner/source/result and rejects corrupt
     if (mutation === "compacted") ref.part.state.time = { compacted: 1 }
     const commandRef = { taskSessionID: "owner", claim: record.claim,
       callKey: createHash("sha256").update(JSON.stringify([record.source.sessionID, record.source.messageID, record.source.callID])).digest("hex"), recovery: structuredClone(record) }
-    f.sessions.get("owner").metadata.o4e.commandTasks = { version: 1, refs: { [taskID]: commandRef } }
+    // A display snapshot can neither authorize a Gate nor substitute for the
+    // independently read canonical record. Deliberately disagree in valid case.
+    f.sessions.get("owner").metadata.o4e.commandTasks = { version: 2, refs: { [taskID]: {
+      snapshot: { ...record, status: mutation === "valid" ? "failed" : "completed" },
+    } } }
+    if (mutation !== "missing-canonical") f.commandSessions.set("owner", { id: "owner", metadata: {
+      o4e: { commandTasks: { version: 1, refs: { [taskID]: commandRef } } },
+    } })
     if (mutation === "index") commandRef.callKey = "wrong"
     if (mutation === "claim") commandRef.claim = "wrong"
     if (mutation === "legacy-layout") {

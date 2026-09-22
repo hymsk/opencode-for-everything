@@ -22,7 +22,7 @@ Workflow 侧栏最多六项，正常终态隐藏但保留 `View all · (总数)`
 
 这些卡片不替换聊天流中的工具卡片，也不受 `enable_o4e_task_detail` 控制：该开关仅控制 `o4e_task` 返回正文，人类单行显示与模型完整有界返回语义保持不变。
 
-新 Bash 任务的账本保存在 owner Session metadata，不另建 Command Session，因此不会增加普通 Session 列表或空子 Agent 导航项。历史 Command Session 不自动删除或迁移。原生后台 Task 工具卡片的勾号表示启动调用已返回，不足以证明 Agent 已完成；OpenCode 1.18.31 对尚未派发的 queued Session 仍可能显示勾号，目前公开插件接口不能独立改变该判定。此限制不等于 O4E 将 queued 视为 completed。
+新 Bash 任务的规范账本保存在独立 O4E SQLite；owner Session metadata 只保留轻量展示摘要，不另建 Command Session，因此不会增加普通 Session 列表或空子 Agent 导航项。历史 Command Session 不自动删除或迁移。原生后台 Task 工具卡片的勾号表示启动调用已返回，不足以证明 Agent 已完成；OpenCode 1.18.31 对尚未派发的 queued Session 仍可能显示勾号，目前公开插件接口不能独立改变该判定。此限制不等于 O4E 将 queued 视为 completed。
 
 Task 侧栏、列表与详情不再重复显示 `Read-only · recorded snapshots`、`recorded` 等提示；记录来源与只读边界仅在此说明。状态随宿主同步的 Session 元数据更新，不证明实时执行或结果验收。保留权限、问题、重试等待、失败、未知与中断等状态；缺失或无法验证的记录仍标为 unavailable。旧记录的 `running` 不证明进程仍运行，`completed` 不代表结果已读取或接受。通过原生任务卡及正常协议中获授权的 `o4e_task status/watch/output` 确认状态与结果。
 

@@ -22,6 +22,8 @@ const text = (value) => typeof value === "string" && value.trim().length > 0 && 
 const object = (value) => value && typeof value === "object" && !Array.isArray(value)
 const terminal = (record) => !["queued", "running"].includes(record.status)
 const safe = (record) => terminal(record) && record.stopped
+const stopUnconfirmed = (result) => !result.stopped
+  || (result.diagnostic && result.diagnostic !== "O4E_COMMAND_PROJECTION_UNAVAILABLE")
 const failure = (code) => Object.assign(new Error(`O4E_COMMAND_${code}`), { code: `O4E_COMMAND_${code}` })
 const callKey = (source) => digest(JSON.stringify([source.sessionID, source.messageID, source.callID]))
 
@@ -119,6 +121,8 @@ function validateRef(ref, owner, taskID) {
   if (ref.taskSessionID !== owner || ref.claim !== record.claim || ref.callKey !== callKey(record.source)) throw failure("INVALID_INDEX")
   return record
 }
+
+export { validateRef as validateCommandRef }
 
 /** Authorized shell input belongs to the host Bash Part, never to Session metadata.
  * lockOwner/parentTaskID are trusted identity fields, not model-supplied options.
@@ -517,6 +521,7 @@ export class CommandTaskRuntime {
         await this.#write(entry, { status: "unknown", phase: "handle-missing", stopped: false, result: undefined })
       }
     }
+    await this.#store.publish?.(owner)
   }
 
   #snapshot(entry) {
@@ -530,7 +535,8 @@ export class CommandTaskRuntime {
       ...(output.logPath === undefined ? {} : { logPath: output.logPath }),
       logBytes: output.logBytes, logComplete: output.logComplete,
       ...(output.logError === undefined ? {} : { logError: output.logError }) } : {}),
-      ...(entry.error ? { diagnostic: entry.error.code } : {}) }
+      ...((entry.error?.code ?? this.#store.diagnostic?.(record.ownerSessionID))
+        ? { diagnostic: entry.error?.code ?? this.#store.diagnostic(record.ownerSessionID) } : {}) }
   }
 
   async #cancel(entry, stopping, knownOnly = false, { force = false } = {}) {
@@ -585,7 +591,7 @@ export class CommandTaskRuntime {
       const rejected = settled.find((result) => result.status === "rejected")
       if (rejected) throw rejected.reason
       const results = settled.map((result) => result.value)
-      if (results.some((result) => !result.stopped || result.diagnostic)) throw failure("CANCEL_UNCONFIRMED")
+      if (results.some(stopUnconfirmed)) throw failure("CANCEL_UNCONFIRMED")
       return results
     })())
     // Keep actual stops and persistence tracked after the caller's deadline.
@@ -615,7 +621,7 @@ export class CommandTaskRuntime {
         const rejected = [...attempts, ...settled].find((result) => result.status === "rejected")
         if (rejected) throw rejected.reason
         const results = settled.map((result) => result.value)
-        if (results.some((result) => !result.stopped || result.diagnostic)) throw failure("CANCEL_UNCONFIRMED")
+        if (results.some(stopUnconfirmed)) throw failure("CANCEL_UNCONFIRMED")
         return results
       } finally {
         const count = this.#state.cancelling.get(sessionID) - 1
@@ -660,7 +666,7 @@ export class CommandTaskRuntime {
       const rejected = [...attempts, ...settled].find((result) => result.status === "rejected")
       if (rejected) throw rejected.reason
       const results = settled.map((result) => result.value)
-      if (results.some((result) => !result.stopped || result.diagnostic)) throw failure("DISPOSE_UNCONFIRMED")
+      if (results.some(stopUnconfirmed)) throw failure("DISPOSE_UNCONFIRMED")
     })()
     this.#disposals.add(work)
     work.then(() => this.#disposals.delete(work), () => this.#disposals.delete(work))

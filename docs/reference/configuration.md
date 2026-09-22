@@ -537,8 +537,8 @@ that do not match the O4E marker.
    read/scoped authority. Write locks between Agents, parent-child lifecycle, and stop confirmation
    are unchanged; conflicts from concurrent modification of the same file and command dependency
    order are coordinated by the caller.
-4. Admission is by owner/kind command lane; the port is invoked only after both the canonical ledger
-   and the owner index persist the execution claim. The admission wait defaults to 1000 ms; after
+4. Admission is by owner/kind command lane; the port is invoked only after the independent SQLite
+   transaction confirms the canonical record and execution claim; the host display summary is published separately. The admission wait defaults to 1000 ms; after
    running starts there is another default 10000 ms window; when still queued/running at expiry it
    returns a snapshot with the stable command `taskID`, and the command keeps executing. Both windows
    are separate from the default 120000 ms execution timeout and are not end-to-end
@@ -576,17 +576,24 @@ The tail grows with output; neither an inspect preview nor a watch heartbeat mea
 
 ### Ledger, Output, and Cancellation
 
-A Command's independent `kind: command` ledger is stored at
-`metadata.o4e.commandTasks.refs[taskID].recovery` of the owner Session; this is the sole canonical
-record, does not use the Agent normalizer, and does not overwrite the owner's `metadata.o4e.task` or
-delegation envelope. No separate Command Session is created, so new commands add neither ordinary
+A Command's independent `kind: command` ledger is stored by directory, owner, and task in private O4E SQLite.
+It is the sole canonical record, does not use the Agent normalizer, and does not overwrite the owner's
+Agent ledger or delegation envelope. Session `metadata.o4e.commandTasks` uses version 2 with allowlisted
+`snapshot` display summaries only. Recovery, output reads, and Workflow Gates read the full bounded record from SQLite. No separate Command Session is created, so new commands add neither ordinary
 Session list entries nor Ctrl+x subagent navigation items. `taskSessionID` equals `ownerSessionID`
 and denotes only the storage container, not a navigable execution session. Source Session/message/call
 identities deduplicate; the command and description bodies stay in the host Bash Part, and the ledger
-stores references/hashes rather than replayable input. Record and reference are committed in one
-owner update, and execution happens only after the claim is confirmed. Historical Command Sessions
-are not scanned, migrated, or deleted; records not matching the current layout are refused further
-processing. Recovery only handles the specified owner: it first recovers uncertain Command
+stores references/hashes rather than replayable input. Records, source indexes, and claims are committed in
+one SQLite transaction; execution happens only after confirmation. Historical Command Sessions and old recovery
+records are not scanned, migrated, or deleted; records not matching the current layout are refused.
+The database defaults to `opencode-for-everything/command-ledgers/<directory-sha256>.sqlite` under the user data directory:
+`XDG_DATA_HOME` (default `~/.local/share`) on Linux/macOS, or `LOCALAPPDATA` (default `~/AppData/Local`) on Windows.
+POSIX private directories use 0700 and databases 0600; no user-configurable database path field is provided.
+Task records do not expire with the 24-hour output-log TTL. Backups or transfers to another machine must preserve
+both this database and the host session data; installation, build, and uninstall do not delete it.
+Moving a project selects a different directory identity and does not guarantee automatic recovery.
+Missing/unreadable databases fail closed instead of reconstructing from summaries. Host summary publication failure
+only reports `O4E_COMMAND_PROJECTION_UNAVAILABLE`; subsequent directed owner recovery can republish it. Recovery only handles the specified owner: it first recovers uncertain Command
 admissions without creating write locks, then queries the handle; it can reattach an existing
 in-process handle, does not re-execute old claims, does not adopt PIDs across host restarts, and does
 not rebuild old commands from user messages. Uncommitted records without a live launch enter

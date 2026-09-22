@@ -29,6 +29,8 @@ npx @hymsk/o4e install
 
 手动源码安装和高级选项见[安装指南](https://github.com/hymsk/opencode-for-everything/blob/main/docs/guide/installation.cn.md)。
 
+当前源码将 Command 恢复账本放在用户数据目录的独立 O4E SQLite 中，Session 仅保存展示摘要；原生卡片刷新和输出保持不变。该存储改动尚未发布，不能据此推断上述 npm 包已包含它。使用此源码构建时应新建会话，旧 Session recovery 不自动迁移或删除。备份须同时保留宿主数据和 O4E 账本；路径与恢复边界见[Command 配置说明](https://github.com/hymsk/opencode-for-everything/blob/main/docs/reference/configuration.cn.md#command-管理)。
+
 ## 使用
 
 ### 开始一次任务

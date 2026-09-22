@@ -29,6 +29,8 @@ Follow the prompts to select installation scope, roles, models, and other option
 
 See the [installation guide](https://github.com/hymsk/opencode-for-everything/blob/main/docs/guide/installation.md) for manual source installation and advanced options.
 
+The current source stores Command recovery records in separate O4E SQLite under the user data directory; Sessions retain display summaries, while native card refresh and output are unchanged. This storage change is not yet released; it does not imply the npm package above includes it. Start a new session when building this source: old Session recovery records are not automatically migrated or deleted. Backups must preserve both host data and the O4E ledger; see [Command configuration](https://github.com/hymsk/opencode-for-everything/blob/main/docs/reference/configuration.md#command-management) for paths and recovery boundaries.
+
 ## Usage
 
 ### Start a task

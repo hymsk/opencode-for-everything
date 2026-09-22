@@ -355,7 +355,7 @@ cross-host service.
 
 Reload only reattaches an in-process handle; it does not rerun an old claim.
 Unsubmitted records without a live launch become `interrupted/not-submitted`;
-resource slot. Unconfirmed cancellation or canonical/owner persistence failure
+resource slot. Unconfirmed cancellation or canonical SQLite persistence failure
 also retains admission and the uncertain record. Do not edit the ledger to free
 the slot or automatically execute a replacement. Retrying cancellation or
 disposal retries stop evidence and persistence only; it does not start a

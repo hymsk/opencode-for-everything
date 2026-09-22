@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { stripJsonComments } from "../../src/jsonc.mjs"
 import { copyInstalledDefaults } from "../helpers/o4e-fixture.mjs"
 import { modelTaskPart } from "../../src/runtime/task-model-output.mjs"
+import { DatabaseSync } from "node:sqlite"
+import { CommandLedgerStore, commandLedgerPath } from "../../src/runtime/command-ledger-store.mjs"
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const pluginUrl = pathToFileURL(join(sourceRoot, "test", "acceptance", "workspace-cwd-plugin.mjs")).href
@@ -15,7 +17,8 @@ const opencode = realpathSync(opencodeName.includes("/") ? opencodeName : run("w
 const runRoot = realpathSync(mkdtempSync("/tmp/opencode/o4e-task-follow-smoke-"))
 const reportPath = join(runRoot, "report.json")
 const modes = [false, true]
-const cards = process.argv.includes("--cards")
+const storage = process.argv.includes("--storage")
+const cards = process.argv.includes("--cards") || storage
 const requestLimit = cards ? 64 : 20
 
 function fail(message, detail) {
@@ -127,6 +130,7 @@ async function runMode(detail) {
   const runtimeConfigPath = join(directory, ".o4e", "config.jsonc")
   const runtimeConfig = readJsonc(runtimeConfigPath)
   runtimeConfig.enable_o4e_task_detail = detail
+  if (cards) runtimeConfig.enableWorkflow = true
   runtimeConfig.soul.enabled = false
   writeFileSync(runtimeConfigPath, `${JSON.stringify(runtimeConfig, null, 2)}\n`)
   run("git", ["init", "--quiet", directory])
@@ -247,9 +251,9 @@ async function runMode(detail) {
     ...Array.from({ length: 19 }, (_, i) => ({ id: `${label}-card-bash-${i}`, name: "bash",
       args: () => ({ command: i === 18
         ? `node -e 'for(let i=1;i<=400;i++) console.log("OUTPUT_LINE_"+String(i).padStart(4,"0")+" "+"x".repeat(48))'`
-        : `printf CARD_${i}`, description: "isolated pagination fixture", timeout: 5000 }),
+        : storage ? "printf '%08192d' 0" : `printf CARD_${i}`, description: "isolated pagination fixture", timeout: 5000 }),
       verify(text) {
-        if (i !== 18) return assert.equal(text, `CARD_${i}`)
+        if (i !== 18) return assert.equal(text, storage ? "0".repeat(8192) : `CARD_${i}`)
         assert.equal(text.split("\n").length, 401)
         assert.match(text, /^OUTPUT_LINE_0001 /)
         assert.match(text, /OUTPUT_LINE_0400 x+\n$/)
@@ -386,7 +390,7 @@ async function runMode(detail) {
       child.once("close", (code) => { clearTimeout(timer); resolvePromise(code) })
     })
     if (exitCode !== 0) fail(`OpenCode ${label} smoke failed with exit ${exitCode}`, { stdout, stderr, runRoot })
-    if (providerFailure) fail(`provider verification failed for ${label}`, { message: providerFailure.message, detail: providerFailure.cause, runRoot })
+    if (providerFailure) fail(`provider verification failed for ${label}`, { message: providerFailure.message, detail: providerFailure.cause, stdout, stderr, runRoot })
     if (issued !== steps.length || providerEvidence.length !== steps.length || !stdout.includes("TASK_FOLLOW_SMOKE_DONE")) {
       fail(`bounded fixture sequence incomplete for ${label}`, { issued, evidence: providerEvidence.length, requests: requests.length, stdout })
     }
@@ -434,8 +438,43 @@ async function runMode(detail) {
       .map((suffix) => toolParts.get(`${label}-${suffix}`).state)
     assert.ok(followParts.every((part) => part.status === "completed" && parseJsonResult(part.output, "follow ToolPart").tasksCancelled === false))
 
+    const hostDb = new DatabaseSync(join(dataHome, "opencode", "opencode.db"), { readOnly: true })
+    let storageEvidence
+    try {
+      const row = hostDb.prepare("SELECT metadata FROM session WHERE id=?").get(sessionID)
+      const metadata = JSON.parse(row.metadata)
+      const ledgerRoot = join(dataHome, "opencode-for-everything", "command-ledgers")
+      const ledger = new CommandLedgerStore({ get: async () => ({ id: sessionID, metadata }) }, directory, { root: ledgerRoot })
+      // Host process has exited. Reopen the actual Bun-written ledger through
+      // Node SQLite and compare exact outputs with the actual completed Parts.
+      const refs = (await ledger.get(sessionID)).metadata.o4e.commandTasks.refs
+      assert.equal(metadata.o4e.commandTasks.version, 2)
+      for (const [id, ref] of Object.entries(refs)) {
+        assert.equal(ref.recovery.status, "completed")
+        assert.equal(ref.recovery.stopped, true)
+        assert.equal(metadata.o4e.commandTasks.refs[id].snapshot.revision, ref.recovery.revision)
+        assert.equal(Object.hasOwn(metadata.o4e.commandTasks.refs[id], "recovery"), false)
+        const part = toolParts.get(ref.recovery.source.callID)
+        assert.ok(part, "canonical source must identify an actual ToolPart")
+        const expected = id === long.metadata.o4eResult.taskID ? "BEGINEND" : modelTaskPart(part).state.output
+        assert.equal(ref.recovery.result.output, expected)
+      }
+      const bytes = (value) => Buffer.byteLength(JSON.stringify(value))
+      const reconstructed = { ...metadata, o4e: { ...metadata.o4e, commandTasks: { version: 1, refs } } }
+      storageEvidence = {
+        tasks: Object.keys(refs).length, exactOutputAfterHostExit: true,
+        projectedCommandBytes: bytes(metadata.o4e.commandTasks), canonicalCommandBytes: bytes({ version: 1, refs }),
+        ownerMetadataBytes: bytes(metadata), reconstructedFullRecoveryOwnerBytes: bytes(reconstructed),
+        ownerMetadataReductionPercent: Number(((1 - bytes(metadata) / bytes(reconstructed)) * 100).toFixed(2)),
+        comparison: "same actual records reconstructed in prior full-recovery layout; not an old-host A/B or total disk reduction",
+        ledgerPath: commandLedgerPath(directory, ledgerRoot),
+        sessionUpdateEvents: hostDb.prepare("SELECT count(*) AS count FROM event WHERE aggregate_id=? AND type=?").get(sessionID, "session.updated.1").count,
+      }
+      if (storage) assert.ok(storageEvidence.ownerMetadataReductionPercent > 85)
+    } finally { hostDb.close() }
     const evidence = {
       detail,
+      storage: storageEvidence,
       cards: cards ? { runID: state.runID, workflowSteps: 22, commandCount: 21, agentTaskID: state.agentTaskID } : undefined,
       sessionID,
       requestCount: requests.length,
@@ -475,12 +514,13 @@ try {
   const report = {
     status: "passed",
     cards,
+    storage,
     opencode: run(opencode, ["--version"]).stdout.trim(),
     node: process.version,
     localPlugin: JSON.parse(readFileSync(join(sourceRoot, "node_modules", "@opencode-ai", "plugin", "package.json"))).version,
     localSdk: JSON.parse(readFileSync(join(sourceRoot, "node_modules", "@opencode-ai", "sdk", "package.json"))).version,
     runRoot,
-    modes: results.map((entry) => ({ detail: entry.detail, sessionID: entry.sessionID, requestCount: entry.requestCount,
+    modes: results.map((entry) => ({ detail: entry.detail, sessionID: entry.sessionID, requestCount: entry.requestCount, storage: entry.storage,
       evidencePath: join(runRoot, entry.detail ? "detail-true" : "detail-false", "evidence.json") })),
     equivalence: {
       watchReadableBody: true,
