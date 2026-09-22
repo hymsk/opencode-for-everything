@@ -70,7 +70,12 @@ test("pnpm override 版本比较符保留用户配置且不能绕过 parser 精�
   build(target)
   assert.deepEqual(readJson(packagePath), {
     ...original,
-    dependencies: { "tree-sitter-bash": "0.25.0", "web-tree-sitter": "0.25.10" },
+    dependencies: {
+      "@opencode-ai/plugin": "1.18.21",
+      effect: "4.0.0-beta.83",
+      "tree-sitter-bash": "0.25.0",
+      "web-tree-sitter": "0.25.10",
+    },
   })
 
   for (const selector of ["tree-sitter-bash@>=0.20", "123-parent@>=1>web-tree-sitter@>0.20"]) {
@@ -78,6 +83,31 @@ test("pnpm override 版本比较符保留用户配置且不能绕过 parser 精�
     writeFileSync(packagePath, content)
     assertBuildFails(target, /Bash parser 依赖冲突/)
     assert.equal(readFileSync(packagePath, "utf8"), content)
+  }
+})
+
+test("生成运行时 manifest 固化插件与 Effect 依赖", () => {
+  const target = createTarget()
+  try {
+    build(target)
+    assert.deepEqual(readJson(join(target, ".opencode", "package.json")).dependencies, {
+      "@opencode-ai/plugin": "1.18.21",
+      effect: "4.0.0-beta.83",
+      "tree-sitter-bash": "0.25.0",
+      "web-tree-sitter": "0.25.10",
+    })
+
+    const packagePath = join(target, ".opencode", "package.json")
+    writeFileSync(packagePath, JSON.stringify({ dependencies: { "@opencode-ai/plugin": "1.18.29", effect: "3.22.2" } }))
+    build(target)
+    assert.deepEqual(readJson(packagePath).dependencies, {
+      "@opencode-ai/plugin": "1.18.29",
+      effect: "3.22.2",
+      "tree-sitter-bash": "0.25.0",
+      "web-tree-sitter": "0.25.10",
+    })
+  } finally {
+    rmSync(target, { recursive: true, force: true })
   }
 })
 

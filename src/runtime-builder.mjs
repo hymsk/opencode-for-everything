@@ -16,7 +16,19 @@ const COMPONENT = "opencode-for-everything"
 const CONFIG_DIR = ".o4e"
 const PLUGIN_FILE = `${COMPONENT}.ts`
 const RUNTIME_COMPONENT_DIRECTORY = "opencode-for-everything"
-const RUNTIME_PARSER_DEPENDENCIES = { "tree-sitter-bash": "0.25.0", "web-tree-sitter": "0.25.10" }
+// These packages are loaded by the copied runtime, not by the installer
+// process.  Keep them in the generated target manifest so a fresh install is
+// reproducible even when OpenCode's own dependency bootstrap is unavailable.
+const RUNTIME_DEPENDENCIES = {
+  "@opencode-ai/plugin": "1.18.21",
+  effect: "4.0.0-beta.83",
+  "tree-sitter-bash": "0.25.0",
+  "web-tree-sitter": "0.25.10",
+}
+const RUNTIME_PARSER_DEPENDENCIES = {
+  "tree-sitter-bash": RUNTIME_DEPENDENCIES["tree-sitter-bash"],
+  "web-tree-sitter": RUNTIME_DEPENDENCIES["web-tree-sitter"],
+}
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/
 const DEFAULT_INSTRUCTION_FILE = "<default>"
 const DEFAULT_SOUL_FILE = "soul.md"
@@ -856,9 +868,10 @@ export function buildRuntime({ target, global = false }) {
   const dependencies = runtimePackage.dependencies === undefined ? {} : requireObject(runtimePackage.dependencies, "运行时 package.json.dependencies")
   for (const field of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
     if (runtimePackage[field] === undefined) continue
-    const declared = requireObject(runtimePackage[field], `运行时 Bash parser ${field}`)
+    const declared = requireObject(runtimePackage[field], `运行时依赖 ${field}`)
     for (const [name, version] of Object.entries(RUNTIME_PARSER_DEPENDENCIES)) {
-      if (declared[name] !== undefined && declared[name] !== version) fail(`运行时 Bash parser 依赖冲突: ${field}.${name} 必须为 ${version}`)
+      if (declared[name] === undefined || declared[name] === version) continue
+      fail(`运行时 Bash parser 依赖冲突: ${field}.${name} 必须为 ${version}`)
     }
   }
   const constraints = [
@@ -900,7 +913,10 @@ export function buildRuntime({ target, global = false }) {
       if (rule && typeof rule === "object") constraints.push({ value: rule, label: `${label}.${selector}`, references, paths, parents, depth: depth + 1 })
     }
   }
-  expected.set(packagePath, `${JSON.stringify({ ...runtimePackage, dependencies: { ...dependencies, ...RUNTIME_PARSER_DEPENDENCIES } }, null, 2)}\n`)
+  // OpenCode may already have materialized a host-compatible plugin version
+  // in this manifest. Preserve existing entries and only fill dependencies
+  // that a fresh build is missing.
+  expected.set(packagePath, `${JSON.stringify({ ...runtimePackage, dependencies: { ...RUNTIME_DEPENDENCIES, ...dependencies } }, null, 2)}\n`)
   expected.set(join(pluginsRoot, PLUGIN_FILE), `export { OpenCodeForEverythingPlugin } from "./${RUNTIME_COMPONENT_DIRECTORY}/plugin.ts"\n`)
   for (const file of sourceRuntimeFiles()) {
     let content = readFileSync(file.source, "utf8")
