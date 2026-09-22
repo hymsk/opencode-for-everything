@@ -381,6 +381,11 @@ recovery 的历史读取或持久化操作。
 | `resume` | 只用于 inspect 的可选布尔值；`true` 自动恢复父 Session 最近预览位置，不能与 `cursor` 并用 |
 | `ioTimeoutMs` | 只用于 inspect/watch 的读取 I/O allowance，1..60000 的安全整数，默认 10000 毫秒；deadline 和消费事务例外见上文 |
 
+公开工具 Schema 允许可选 `cursor`、`direction`、`maxBytes`、`resume`、`ioTimeoutMs`
+使用 `null`；适配器在严格 Runtime 校验前将其视为省略。首次预览或自动续读应省略手工
+游标或使用 `cursor:null`，不要编造 `"x"` 等占位值。非空游标仍须校验，
+`resume:true` 与手工游标同时提供仍拒绝。
+
 Plugin 和 Runtime 都校验参数。省略 `resume` 或设为 false 且不带手工游标时
 返回近期 tail，这是有意重置读取位置，不是 gap 的无损恢复；带 `cursor` 向前
 获取增量，或在返回 `beforeCursor` 时用它配合 `direction:"backward"`
@@ -478,6 +483,8 @@ OpenCode `directory` 是活动工作目录，`worktree` 是仓库/项目规则�
 ### Command 管理
 
 Agent 和 Command 的取消调用统一为 `{"action":"cancel","taskID":"…"}`，只传这两个字段。
+若模型为扁平工具 Schema 填入其他动作的可选字段，适配器会在严格取消校验前丢弃这些字段；
+不会从 `taskIDs` 推断目标，也不会扩大为批量取消。所有权、权限和停止证据校验不变。
 所有动作均不接受 `reason` 输入（包括 `resolve`）；内部取消诊断及 watch／Command 输出的 `reason` 保留。
 
 `o4e_task` 支持 command 的 `status/watch/inspect/output/cancel/pending`；

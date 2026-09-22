@@ -13,6 +13,7 @@ import { createSharedScopeLockManager } from "../src/runtime/scope-locks.mjs"
 import { createSharedBackgroundTaskScheduler } from "../src/runtime/background-task-scheduler.mjs"
 import { copyInstalledDefaults } from "./helpers/o4e-fixture.mjs"
 import { DatabaseSync } from "node:sqlite"
+import { z } from "zod"
 import { commandLedgerPath } from "../src/runtime/command-ledger-store.mjs"
 
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
@@ -382,12 +383,12 @@ async function fixture(t, { buildPermission = {}, shell = "/bin/bash", maxConcur
   return f
 }
 
-test("Agent/Command cancel expose no reason and use the same minimal public call", options, async (t) => {
+test("Agent/Command cancel normalize filled transport fields without bypassing authorization or stop evidence", options, async (t) => {
   const f = await fixture(t, { commandWaitOptions: { timeoutMs: 20, runningTimeoutMs: 100 } })
   assert.equal(Object.hasOwn(f.hooks.tool.o4e_task.args, "reason"), false)
   const agent = await f.general()
   const command = await f.bash("sleep 5; touch must-not-run.txt")
-  assert.equal(command.status, "running")
+  await until(() => f.record(command.taskID).status === "running")
   const aborts = f.client.abortCalls.length
   const asks = f.asks.length
   for (const [taskID, sessionID] of [[agent.taskID, "parent"], [command.taskID, "native"]]) {
@@ -399,8 +400,19 @@ test("Agent/Command cancel expose no reason and use the same minimal public call
   }
   assert.equal(f.client.abortCalls.length, aborts)
   assert.equal(f.asks.length, asks)
-  assert.equal((await f.read(command.taskID, "cancel")).status, "cancelled")
-  await f.read(agent.taskID, "cancel", f.context({ sessionID: "parent" }))
+  // Actual Luna transport shape: irrelevant nonempty fields must not reach
+  // the strict Runtime cancel input or alter the single selected task.
+  const filled = { cursor: "x", direction: "forward", enabled: true, expectedRevision: 1,
+    input: "", ioTimeoutMs: 10000, maxBytes: 1024, message: "", reply: "once",
+    requestID: "", resume: false, timeoutMs: 0, delivery: "queue", decision: "continue", answers: [], taskIDs: [] }
+  await assert.rejects(f.json("o4e_task", { ...filled, action: "cancel", taskID: command.taskID }, f.context({ sessionID: "other" })), /O4E_COMMAND_NOT_OWNED/)
+  assert.equal(f.record(command.taskID).status, "running")
+  assert.equal((await f.json("o4e_task", { ...filled, action: "cancel", taskID: command.taskID })).status, "cancelled")
+  assert.equal(f.record(command.taskID).stopped, true)
+  assert.equal(f.active(command.taskID), false)
+  await f.json("o4e_task", { ...filled, action: "cancel", taskID: agent.taskID }, f.context({ sessionID: "parent" }))
+  assert.ok(f.asks.slice(asks).some((ask) => ask.patterns.includes("command:cancel")))
+  assert.ok(f.asks.slice(asks).some((ask) => ask.patterns.includes("agent:cancel")))
   await f.hooks.event({ event: { type: "session.idle", properties: { sessionID: agent.sessionID } } })
   assert.equal(f.client.sessions.get(agent.sessionID).metadata.o4e.task.status, "cancelled")
   assert.equal(existsSync(join(f.directory, "must-not-run.txt")), false)
@@ -545,27 +557,36 @@ test("Bash model text is independent of escaped metadata size and keeps failure 
 
 test("command inspect resumes intact running and failed previews but rejects rewritten output", options, async (t) => {
   const f = await fixture(t, { commandWaitOptions: { runningTimeoutMs: 100 }, buildPermission: { bash: "allow" } })
+  const schema = z.object(f.hooks.tool.o4e_task.args)
+  const inspect = (taskID, resume) => f.json("o4e_task", schema.parse({
+    action: "inspect", taskID, cursor: null, resume, direction: null, maxBytes: null, ioTimeoutMs: null,
+  }))
   const command = "printf FIRST; while [ ! -e release ]; do sleep 0.01; done; printf NEXT; exit 7"
   const running = await f.bash(command)
   assert.equal(running.status, "running")
   const taskID = running.taskID
-  const first = await f.read(taskID, "inspect")
+  const first = await inspect(taskID, null)
   assert.equal(first.tail, "FIRST")
-  assert.equal((await f.read(taskID, "inspect", undefined, { resume: true })).unchanged, true)
+  assert.equal((await inspect(taskID, true)).unchanged, true)
   const messages = f.client.messages.get("native")
   const prior = messages.at(-1).parts[0]
   assert.equal(prior.state.metadata.kind, "command")
   prior.state.output = "Inspection summarized."
-  const damaged = await f.read(taskID, "inspect", undefined, { resume: true })
+  const damaged = await inspect(taskID, true)
   assert.equal(damaged.unavailable, "resume-preview-unavailable")
   assert.equal(damaged.tail, undefined)
-  assert.equal((await f.read(taskID, "inspect", undefined, { resume: false })).tail, "FIRST")
+  assert.equal((await inspect(taskID, false)).tail, "FIRST")
   writeFileSync(join(f.directory, "release"), "")
   await until(() => f.record(taskID)?.status === "failed")
-  const appended = await f.read(taskID, "inspect", undefined, { resume: true })
+  const appended = await inspect(taskID, true)
   assert.equal(appended.status, "failed")
   assert.equal(appended.tail, "NEXT")
-  assert.equal((await f.read(taskID, "inspect", undefined, { resume: true })).unchanged, true)
+  assert.equal((await inspect(taskID, true)).unchanged, true)
+  const gap = await f.read(taskID, "inspect", undefined, { cursor: "x" })
+  assert.equal(gap.gap, "cursor-invalid-or-output-changed")
+  assert.equal(gap.tail, undefined)
+  await assert.rejects(f.read(taskID, "inspect", undefined, { cursor: first.cursor, resume: true }), /resume cannot/)
+  assert.equal((await inspect(taskID, true)).unavailable, "resume-tool-error", "failed reads cannot reset the preview position")
 })
 
 test("detached Bash ignores its completed reader abort while fresh tail grows until terminal settlement", options, async (t) => {

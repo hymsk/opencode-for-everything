@@ -429,6 +429,11 @@ persistence operations.
 | `resume` | optional boolean only for inspect; `true` automatically resumes the parent Session's most recent preview position; cannot be used together with `cursor` |
 | `ioTimeoutMs` | read I/O allowance only for inspect/watch, safe integer 1..60000, default 10000 ms; deadline and consumption transaction exceptions are described above |
 
+The public tool Schema accepts `null` for optional `cursor`, `direction`, `maxBytes`, `resume`,
+and `ioTimeoutMs`; the adapter treats it as omission before strict Runtime validation. For a fresh
+preview or automatic resume, omit the manual cursor or use `cursor:null`. Never invent a placeholder
+such as `"x"`. Nonempty cursors remain validated; `resume:true` with a manual cursor is still rejected.
+
 Both Plugin and Runtime validate parameters. Omitting `resume` or setting it to false without a
 manual cursor returns the recent tail — this is an intentional read-position reset, not lossless
 recovery from a gap; pass a `cursor` to fetch increments forward, or when `beforeCursor` is returned
@@ -547,7 +552,10 @@ that do not match the O4E marker.
 ### Command Management
 
 Cancellation for Agent and Command is unified as `{"action":"cancel","taskID":"…"}` with only these
-two fields. No action accepts a `reason` input (including `resolve`); internal cancellation
+two fields. If a model fills optional fields for other actions in the flat tool Schema, the adapter
+discards them before strict cancellation validation. It never infers a target from `taskIDs` or
+expands cancellation to multiple tasks; ownership, permissions and stop evidence remain required.
+No action accepts a `reason` input (including `resolve`); internal cancellation
 diagnostics and the `reason` in watch/Command output are retained.
 
 `o4e_task` supports `status/watch/inspect/output/cancel/pending` for commands;

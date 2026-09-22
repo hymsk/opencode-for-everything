@@ -18,6 +18,11 @@
 
 上述 revision 仅为示例。恢复时重新读取，将 `enabled` 改为 `true`。不提供 `taskID` 或 `taskIDs`；选择适用于当前 owner，不改变 Task 执行。普通用户消息不解除显式停止，选择在 Session metadata 中持久化。自然语言由主 Agent 理解并调用控制操作，Runtime 不猜测用户文本。
 
+若模型传输要求给可选字段填值，只读查询使用 `enabled:null` 和 `expectedRevision:null`；
+null 表示省略，不表示 false。适配器清理无关动作字段和空 Task 选择器占位值，但仍拒绝实际
+Task 选择器以及 `reason`、`cursors`、`reread` 等禁止字段。显式修改仍要求布尔值和最新
+修订号；只读查询不能携带非 null 的修订号。不要编造开关值或修订号。
+
 宿主根回合 abort 是临时抑制，下一真实用户回合解除；它与显式停止不同。已脱离 Bash 不因该临时抑制取消，但 `dispose`、owner 删除、子任务生命周期终止和显式 cancel 仍保留停止边界。
 
 ## 失败与恢复边界

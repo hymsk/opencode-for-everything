@@ -183,6 +183,8 @@ Agent 任务 `input` 默认必须采用安全的下一轮语义。必须通过�
 
 公开 `o4e_task cancel` 对 Agent 与 Command 必须统一只接受 `action: "cancel"` 和单个非空 `taskID`，不要求取消原因或 revision。公开工具 Schema 不得声明 `reason` 输入，所有动作（包括 `resolve`）均不接受该输入；插件在按任务类型路由前统一拒绝，并且 Runtime 入口同样校验。内部生命周期诊断、Command 停止原因及 watch 输出的 `reason` 不属于被移除的输入字段，继续保留。不得为省略原因而绕过所有权、宿主权限、停止证据或保守锁。
 
+公开适配器必须将 `cancel` 纳入按 action 的字段归一化：模型为扁平工具 Schema 填入其他动作的可选字段时，丢弃这些非取消字段，只将 `action` 和单个非空 `taskID` 交给严格 Runtime 校验。不得从 `taskIDs` 推断目标或扩大为批量取消；`reason`、`cursors`、`reread` 等明确禁止的输入继续拒绝。归一化不构成授权，Agent/Command 的所有权、宿主 ask、停止证据和不确定资源边界保持不变。验收依据：`test/task-tool.test.mjs`、`test/plugin-command-task.test.mjs` 及真实宿主模型取消调用。
+
 `o4e_task watch` 必须冻结调用入口解析出的所有者可见选择。选择可以同时包含 Agent 和命令任务。省略选择器时，必须选择所有者当前待处理的 Agent 与命令任务；授权仍
 按类型区分并绑定所有者。显式空 `taskIDs` 数组必须选择零个任务，不得回退到所有者集合。终端回执已持久确认的终端 Agent 任务会从省略选择器集合中排除；显式选择器仍可访问它，
 但已消费的终端事件不得再次唤醒 watch。冻结选择不会加入之后创建的任务；只有 watch 接受混合的 `taskIDs`，其他操作要求单个 `taskID`。Watch
@@ -210,6 +212,8 @@ Runtime 输入边界执行；读取预算构造器必须直接使用已校验选
 
 Agent 检查位置必须使用当前紧凑 cursor 格式，长度最多 120 个字符；其他编码必须拒绝。共享工具输入限制对类型专属 cursor 仍为 512 个字符。每个 cursor
 必须绑定执行、源前缀签名和 UTF-8 偏移，保留拒绝继续（fail closed）的 `gap` 行为，且绝不授予授权或要求额外 cursor 状态。
+
+公开工具 Schema 必须允许 inspect 的可选 `cursor`、`direction`、`maxBytes`、`resume`、`ioTimeoutMs` 使用 `null` 表达省略，适配器在严格 Runtime 校验前移除这些传输空值。首次预览和自动续读使用省略或 `cursor:null`，不得要求模型编造占位游标。非空手工 cursor 仍须原样校验，不能因无效而丢弃；`resume:true` 与非空手工 cursor 同时提供仍拒绝，历史损坏／缺口仍不得自动跳到新尾部。
 
 只有 inspect 可以接受布尔值 `resume`。inspect/watch 可以接受 1..60000 范围内的安全整数 `ioTimeoutMs`（默认 10000
 毫秒）。二者的读取调用预算必须从工具执行入口开始，覆盖恢复、授权、cursor 扫描、watch 窗口、到期复查和 UI 等待。Inspect 截止时间必须是 I/O 允许时长；watch
@@ -262,6 +266,8 @@ Watch 不得执行 heartbeat 检查或返回 tail/cursor 字段。其有界结�
 回执。预检出的业务结果在整个回执事务中必须保持不变；并发的新执行不得替换它。这不会使多回执持久化变为原子操作，也不改变 watch 唤醒条件。
 
 `o4e_task action:follow` 必须提供当前根 owner 的自动跟踪状态读取与显式启停。仅获授权的受管 primary/all 根调用方可使用，必须经过宿主 `o4e_task:follow` 授权；不接受 Task selector。省略 `enabled` 只读；设置布尔 `enabled` 必须携带当前 `expectedRevision`。选择在 owner 的 `metadata.o4e.automaticFollow` 持久化，普通用户插话和新插件实例不得解除显式停用；它不取消 Task、不回复交互、不恢复旧 Task 执行。abort 的临时抑制仍只持续到下一真实用户回合。自动跟踪失败须持久化不含原始错误正文的 `automatic-follow-failed` 诊断并停用，状态读取提供显式恢复方式。宿主元数据写入按同进程 owner 串行化；不承诺跨进程 CAS 或 exactly-once。
+
+Follow 的公开 Schema 必须允许 `enabled:null` 和 `expectedRevision:null` 表达省略，用于明确只读查询；不得将 null 推断为开或关。适配器按 action 清理其他动作的填充字段，空 `taskID` 和空 `taskIDs` 不构成选择，实际非空或畸形 Task selector 仍拒绝。非空修订号不能在只读查询中静默丢弃，布尔启停仍须有效 CAS；`reason`、`cursors`、`reread` 等禁止字段继续拒绝。归一化不得改变 owner、授权或执行行为。
 
 非终态 actionable 变化必须唤醒空闲 owner 一次以报告等待或异常，去重依据包含 Task 身份、状态、阶段和 revision；同一变化报告后不得因新 assistant idle 锚点形成忙循环。自动提交前必须再次校验真实用户回合和持久化启停控制。
 

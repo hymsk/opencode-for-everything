@@ -369,6 +369,8 @@ const TASK_ACTION_FIELDS: Record<string, readonly string[]> = {
   watch: ["taskID", "taskIDs", "timeoutMs", "ioTimeoutMs"],
   inspect: ["taskID", "cursor", "direction", "maxBytes", "resume", "ioTimeoutMs"],
   output: ["taskID"],
+  cancel: ["taskID"],
+  follow: ["enabled", "expectedRevision"],
   input: ["taskID", "input", "expectedRevision", "delivery"],
   resume: ["taskID", "expectedRevision"],
   resolve: ["taskID", "expectedRevision", "decision"],
@@ -385,6 +387,15 @@ export function normalizeTaskToolArgs(args: any): any {
   const action = args?.action
   if (args && typeof args === "object" && Object.hasOwn(TASK_ACTION_FIELDS, action)) {
     args = { ...args }
+    // Follow is owner-scoped, never a Task operation. Empty transport selectors
+    // carry no selection; reject actual selectors instead of retargeting them.
+    if (action === "follow") {
+      if (!blankTaskArg(args.taskID) || (args.taskIDs != null
+        && !(Array.isArray(args.taskIDs) && args.taskIDs.length === 0))) {
+        throw new Error("O4E_FOLLOW_INVALID_ARGUMENTS: follow does not accept Task selectors")
+      }
+      if (args.enabled === null) delete args.enabled
+    }
     const allowed = new Set(["action", ...TASK_ACTION_FIELDS[action]])
     for (const key of Object.keys(args)) {
       if (!allowed.has(key) && !TASK_ARGS_VALIDATOR_KEYS.has(key)) delete args[key]
@@ -2558,19 +2569,19 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
         description: O4E_TASK_DESCRIPTION + " Cancel Agent and Command Tasks with only action:cancel and taskID; reason is not an input field for any action. Root managed primary/all callers can read action:follow, then persist enabled:false|true with expectedRevision to stop/resume owner automatic tracking. Follow accepts no Task selector, never cancels Tasks, and an explicit stop persists across ordinary user turns. On automatic-follow-failed read follow state and explicitly resume when authorized.",
         args: {
           action: tool.schema.enum(["status", "watch", "inspect", "output", "input", "resume", "cancel", "resolve", "pending", "permission.reply", "question.reply", "question.reject", "follow"]),
-          enabled: tool.schema.boolean().optional().describe("Follow only: persist owner automatic tracking on/off; omit to read. Changes require expectedRevision. Does not cancel tasks."),
+          enabled: tool.schema.boolean().nullable().optional().describe("Follow only: omit or use null to READ current state, never guess true/false for a read. Set false/true only to explicitly stop/resume owner automatic tracking, with the revision returned by a prior read. Does not cancel tasks."),
           taskID: tool.schema.string().optional().describe("Select one Agent or command Task. Required for inspect/output/cancel and command status/pending; omit selectors for watch to monitor all owned Agent and Bash Tasks"),
           taskIDs: tool.schema.array(tool.schema.string()).optional().describe("Watch only: explicit Agent and/or command Task IDs; omit to watch all owned Tasks, [] selects nothing"),
-          cursor: tool.schema.string().min(1).max(512).refine((value) => value.trim().length > 0).optional().describe("Inspect only: opaque cursor from a prior response, not authorization. Agent cursors use the current compact format, at most 120 characters"),
-           direction: tool.schema.enum(["forward", "backward"]).optional().describe("Inspect only, default forward; use beforeCursor with backward for earlier data when provided"),
-           maxBytes: tool.schema.number().int().min(4).max(8192).optional().describe("Inspect only: UTF-8 tail byte budget, default 1024, range 4..8192. Does not bound SDK message/Part downloads"),
+          cursor: tool.schema.string().min(1).max(512).refine((value) => value.trim().length > 0).nullable().optional().describe("Inspect only: omit or use null for a fresh preview or when resume=true. Never invent a cursor or use placeholders such as x. For manual pagination copy the exact cursor/beforeCursor from a prior response; not authorization. Agent cursors use the current compact format, at most 120 characters"),
+           direction: tool.schema.enum(["forward", "backward"]).nullable().optional().describe("Inspect only, omitted/null defaults to forward; use beforeCursor with backward for earlier data when provided"),
+           maxBytes: tool.schema.number().int().min(4).max(8192).nullable().optional().describe("Inspect only: UTF-8 tail byte budget, omitted/null defaults to 1024, range 4..8192. Does not bound SDK message/Part downloads"),
            timeoutMs: tool.schema.number().int().min(0).max(WATCH_MAX_TIMEOUT_MS).optional().describe("Watch-only window in milliseconds, maximum 3600000 (one hour). Omitted or zero uses the 1800000 ms (30-minute) default; a positive value selects the window. Heartbeat is not Task completion"),
-          resume: tool.schema.boolean().optional().describe("Inspect only: true resumes from this parent Session's latest persisted inspect automatically; never supply cursor with resume. Backward inspect uses its beforeCursor. Missing/invalid history reports unavailable, never silently skips to the live tail. Omit/false for an explicit fresh tail."),
-           ioTimeoutMs: tool.schema.number().int().min(1).max(60_000).optional().describe("Inspect/watch only: total read-call I/O allowance, default 10000 ms. Inspect deadline is this allowance; watch deadline is its window plus this allowance. Receipt commits already admitted must settle; timeout does not cancel the Task or shared recovery."),
+          resume: tool.schema.boolean().nullable().optional().describe("Inspect only: true resumes from this parent Session's latest persisted inspect automatically; omit cursor or set cursor=null, never supply a manual cursor. Backward inspect uses its beforeCursor. Missing/invalid history reports unavailable, never silently skips to the live tail. Omit/null/false without a cursor for an explicit fresh tail."),
+           ioTimeoutMs: tool.schema.number().int().min(1).max(60_000).nullable().optional().describe("Inspect/watch only: total read-call I/O allowance, omitted/null defaults to 10000 ms. Inspect deadline is this allowance; watch deadline is its window plus this allowance. Receipt commits already admitted must settle; timeout does not cancel the Task or shared recovery."),
           input: tool.schema.string().optional().describe("Additional instruction for the same child Session; requires expectedRevision"),
           delivery: tool.schema.enum(["queue", "steer"]).optional().describe("Input delivery: queue for the next turn (default), or steer to admit input for the next runnable turn; unsupported steer falls back to queue"),
           decision: tool.schema.enum(["continue", "restart", "stop"]).optional(),
-          expectedRevision: tool.schema.number().int().min(1).optional().describe("CAS revision for input/resume and interaction replies"),
+          expectedRevision: tool.schema.number().int().min(1).nullable().optional().describe("CAS revision for input/action:resume, interaction replies and follow changes. For a follow READ omit or use null along with enabled=null. For a change copy the latest returned revision; never invent one. Not used for inspect resume=true."),
           requestID: tool.schema.string().optional(),
           reply: tool.schema.enum(["once", "always", "reject"]).optional(),
           message: tool.schema.string().max(512).optional(),

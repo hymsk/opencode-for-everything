@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { z } from "zod"
 import { modelTaskPart } from "../src/runtime/task-model-output.mjs"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -1917,7 +1918,9 @@ test("o4e_task resume refuses rewritten public previews and requires an explicit
       parts: [body],
     })
     const context = (callID) => ({ ...toolContext(target), callID })
-    const args = { action: "inspect", taskID: created.taskID, resume: true }
+    const schema = z.object(hooks.tool.o4e_task.args)
+    const args = schema.parse({ action: "inspect", taskID: created.taskID, cursor: null, resume: true,
+      direction: null, maxBytes: null, ioTimeoutMs: null })
     const first = await persistedTaskRead(hooks, client, args, context("preview-original"))
     assert.equal(first.tail, body.text)
     body.text += "-appended"
@@ -2667,14 +2670,21 @@ test("unchanged cancelling does not automatically wake on every assistant anchor
 test("follow 控制持久化、CAS、授权和重载，不取消后台且新用户回合不解除显式停止", async () => {
   await withTaskReadFixture(async ({ target, hooks, client, created }) => {
     const context = toolContext(target)
-    const follow = async (args = {}, ctx = context) => taskResult(await hooks.tool.o4e_task.execute({ action: "follow", ...args }, ctx))
+    const schema = z.object(hooks.tool.o4e_task.args)
+    const follow = async (args = {}, ctx = context) => taskResult(await hooks.tool.o4e_task.execute(schema.parse({
+      action: "follow", enabled: null, expectedRevision: null, taskID: "", taskIDs: [],
+      cursor: "x", resume: true, direction: "backward", maxBytes: 128, ...args,
+    }), ctx))
     const initial = await follow()
     assert.equal(initial.enabled, true)
+    const beforeRead = structuredClone(client.sessions.get("parent").metadata)
+    assert.deepEqual(await follow(), initial)
+    assert.deepEqual(client.sessions.get("parent").metadata, beforeRead, "nullable read must not change owner follow state")
     const stopped = await follow({ enabled: false, expectedRevision: initial.revision })
     assert.equal(stopped.enabled, false)
     assert.equal(stopped.tasksCancelled, false)
     await assert.rejects(follow({ enabled: true, expectedRevision: initial.revision }), /REVISION_CONFLICT/)
-    await assert.rejects(follow({ enabled: "false", expectedRevision: stopped.revision }), /INVALID_ARGUMENTS/)
+    await assert.rejects(follow({ enabled: "false", expectedRevision: stopped.revision }), /boolean|INVALID_ARGUMENTS/)
     await assert.rejects(follow({ taskID: created.taskID }), /INVALID_ARGUMENTS/)
     await assert.rejects(follow({}, { ...context, ask: undefined }), /ASK_REQUIRED/)
     await assert.rejects(follow({}, { ...context, ask: async () => { throw new Error("host denied") } }), /host denied/)

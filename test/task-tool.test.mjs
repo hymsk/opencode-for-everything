@@ -6,7 +6,7 @@ import { normalizePermissionOverlayInput } from "../src/core/agent-routing.mjs"
 test("cancel 对 Agent/Command 使用相同最小参数，reason 不再是输入字段", () => {
   for (const taskID of ["o4e_task_example", "o4e_command_example"]) {
     assert.deepEqual(normalizeTaskToolArgs({ action: "cancel", taskID: ` ${taskID} ` }), { action: "cancel", taskID })
-    for (const extra of [{ reason: "stop" }, { reason: "" }, { reason: undefined }, { expectedRevision: 1 }, { taskIDs: [] }]) {
+    for (const extra of [{ reason: "stop" }, { reason: "" }, { reason: undefined }]) {
       assert.throws(() => normalizeTaskToolArgs({ action: "cancel", taskID, ...extra }), /O4E_TASK_INVALID_ARGUMENTS/)
     }
   }
@@ -202,6 +202,15 @@ test("o4e_task 容忍模型填充的全量垃圾字段（真实会话载荷回�
   assert.deepEqual(normalizeTaskToolArgs({
     ...filledJunk, action: "output", taskID: "o4e_command_21a595f5657a4ec1ab0446242ae1f9f2", taskIDs: [],
   }), { action: "output", taskID: "o4e_command_21a595f5657a4ec1ab0446242ae1f9f2" })
+  for (const taskID of ["o4e_command_example", "o4e_task_example"]) {
+    const args = { ...filledJunk, action: "cancel", taskID: ` ${taskID} `, taskIDs: ["another-task"] }
+    const before = structuredClone(args)
+    assert.deepEqual(normalizeTaskToolArgs(args), { action: "cancel", taskID })
+    assert.deepEqual(args, before, "normalization must not mutate the caller's transport arguments")
+    for (const forbidden of [{ reason: "stop" }, { cursors: {} }, { reread: false }]) {
+      assert.throws(() => normalizeTaskToolArgs({ ...args, ...forbidden }), /O4E_TASK_INVALID_ARGUMENTS/)
+    }
+  }
   assert.deepEqual(normalizeTaskToolArgs({
     ...filledJunk, action: "watch", taskID: "", taskIDs: ["o4e_command_c4de463ccb9d4fa593865ff9484f3d7a"], timeoutMs: 30_000,
   }), { action: "watch", taskIDs: ["o4e_command_c4de463ccb9d4fa593865ff9484f3d7a"], timeoutMs: 30_000, ioTimeoutMs: 10_000 })
@@ -212,10 +221,28 @@ test("o4e_task 容忍模型填充的全量垃圾字段（真实会话载荷回�
   assert.throws(() => normalizeTaskToolArgs({
     ...filledJunk, action: "watch", taskID: "task-one", taskIDs: ["task-two"],
   }), /不能同时提供/)
-  // follow 保持严格白名单：持久开关不接受无关字段。
-  assert.throws(() => normalizeTaskToolArgs({
+  // follow 清理跨 action 填充，但不从 Task selector 推断 owner。
+  assert.deepEqual(normalizeTaskToolArgs({
     ...filledJunk, action: "follow",
-  }), /O4E_FOLLOW_INVALID_ARGUMENTS/)
+  }), { action: "follow", enabled: true, expectedRevision: 1 })
+})
+
+test("follow 可空传输区分只读与显式启停，不猜测 revision 或 Task selector", () => {
+  const placeholders = { action: "follow", enabled: null, expectedRevision: null,
+    taskID: "", taskIDs: [], cursor: "x", resume: true, direction: "backward", maxBytes: 128 }
+  assert.deepEqual(normalizeTaskToolArgs(placeholders), { action: "follow" })
+  assert.deepEqual(placeholders.enabled, null)
+  for (const enabled of [false, true]) {
+    assert.deepEqual(normalizeTaskToolArgs({ ...placeholders, enabled, expectedRevision: 3 }), {
+      action: "follow", enabled, expectedRevision: 3,
+    })
+    assert.throws(() => normalizeTaskToolArgs({ ...placeholders, enabled }), /O4E_FOLLOW_INVALID_ARGUMENTS/)
+  }
+  for (const extra of [{ enabled: "false" }, { enabled: "" }, { expectedRevision: 1 },
+    { taskID: "other" }, { taskID: 1 }, { taskIDs: ["other"] }, { taskIDs: [""] },
+    { reason: "stop" }, { cursors: {} }, { reread: false }]) {
+    assert.throws(() => normalizeTaskToolArgs({ ...placeholders, ...extra }), /O4E_FOLLOW_INVALID_ARGUMENTS/)
+  }
 })
 
 test("受管 task 的 background:false 填充签名不强制前台委派", () => {
@@ -301,9 +328,8 @@ test("o4e_task watch 接受状态选择并拒绝输出分页参数", () => {
   for (const action of ["watch", "status", "output", "input", "cancel", "resolve", "pending", "permission.reply", "question.reply", "question.reject"]) {
     for (const [key, value] of Object.entries({ cursor: "cursor", direction: "forward", maxBytes: 1024 })) {
       const junk = { action, taskID: "task", [key]: value }
-      if (action === "cancel") assert.throws(() => normalizeTaskToolArgs(junk), /O4E_TASK_INVALID_ARGUMENTS/)
-      else if (action === "watch") assert.deepEqual(normalizeTaskToolArgs(junk), { action, taskIDs: ["task"] })
-      else if (["status", "output", "pending", "question.reject"].includes(action)) assert.deepEqual(normalizeTaskToolArgs(junk), { action, taskID: "task" })
+      if (action === "watch") assert.deepEqual(normalizeTaskToolArgs(junk), { action, taskIDs: ["task"] })
+      else if (["status", "output", "pending", "question.reject", "cancel"].includes(action)) assert.deepEqual(normalizeTaskToolArgs(junk), { action, taskID: "task" })
       else if (action === "input") assert.throws(() => normalizeTaskToolArgs(junk), /input/)
       else if (action === "resolve") assert.throws(() => normalizeTaskToolArgs(junk), /expectedRevision/)
       else if (action === "permission.reply") assert.throws(() => normalizeTaskToolArgs(junk), /reply/)
@@ -343,6 +369,15 @@ test("受管 task 适配器只归一化已知 functions.* permissionOverlay 别�
 })
 
 test("inspect 续读与 watch 等待分别验证读取参数，I/O 预算不扩展到写动作", () => {
+  for (const resume of [null, false, true]) {
+    const input = { action: "inspect", taskID: "task", cursor: null, resume,
+      direction: null, maxBytes: null, ioTimeoutMs: null }
+    assert.deepEqual(normalizeTaskToolArgs(input), {
+      action: "inspect", taskID: "task", direction: "forward", maxBytes: 1024,
+      ...(resume === null ? {} : { resume }),
+    })
+    assert.equal(input.cursor, null, "transport input remains unchanged")
+  }
   assert.deepEqual(normalizeTaskToolArgs({ action: "inspect", taskID: "task", resume: true, ioTimeoutMs: 1 }), {
     action: "inspect", taskID: "task", resume: true, ioTimeoutMs: 1, direction: "forward", maxBytes: 1024,
   })

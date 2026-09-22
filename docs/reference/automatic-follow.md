@@ -18,6 +18,12 @@ Only managed `primary`/`all` root callers may manage their own follow choice, an
 
 The revision above is only an example. To resume, reread and change `enabled` to `true`. No `taskID` or `taskIDs` is provided; the choice applies to the current owner and does not change Task execution. Ordinary user messages do not lift an explicit stop; the choice persists in Session metadata. Natural language is understood by the main Agent, which invokes the control operation; the Runtime does not guess from user text.
 
+If the model transport requires values for optional fields, use `enabled:null` and
+`expectedRevision:null` for a read; null means omitted, not false. The adapter discards unrelated
+action fields and empty Task selector placeholders, but rejects actual Task selectors and forbidden
+fields (`reason`, `cursors`, `reread`). Explicit changes still require a boolean and the latest
+revision; a read must not supply a non-null revision. Do not invent a switch value or revision.
+
 A host root-turn abort is a temporary suppression, lifted by the next real user turn; it differs from an explicit stop. Detached Bash is not cancelled by this temporary suppression, but `dispose`, owner deletion, child task lifecycle termination, and explicit cancel still preserve stop boundaries.
 
 ## Failure and Recovery Boundaries
