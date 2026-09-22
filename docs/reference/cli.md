@@ -63,6 +63,8 @@ Running the CLI without any arguments shows help and exits normally; it does not
 
 `build` validates the configuration and the internal managed Skill registry, and generates `.opencode/agents/` and `.opencode/plugins/`; it does not modify `.o4e/` or the public `.opencode/skills/`. Skills are registered by the plugin directly from `.o4e/skills/`. A global `build` does not register plugins; registration only happens on global install or import.
 
+Build only declares O4E's direct runtime dependencies, including Effect and the Bash parsers. It does not install dependencies or supply a default `@opencode-ai/plugin` version; OpenCode prepares the SDK at startup. Existing SDK and Effect declarations in the target `package.json` are preserved, not deleted or overwritten by build. The repository's pinned development SDK is not a version lock for the user's runtime directory. Intranet environments still need the host's package manager to access the required packages; declarations do not mean dependencies are installed or ready for offline use.
+
 ## Native Agent Strategies
 
 The `nativeAgents` in the installation configuration always contains four entries:

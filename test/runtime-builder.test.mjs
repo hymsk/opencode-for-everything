@@ -71,7 +71,6 @@ test("pnpm override 版本比较符保留用户配置且不能绕过 parser 精�
   assert.deepEqual(readJson(packagePath), {
     ...original,
     dependencies: {
-      "@opencode-ai/plugin": "1.18.21",
       effect: "4.0.0-beta.83",
       "tree-sitter-bash": "0.25.0",
       "web-tree-sitter": "0.25.10",
@@ -86,18 +85,19 @@ test("pnpm override 版本比较符保留用户配置且不能绕过 parser 精�
   }
 })
 
-test("生成运行时 manifest 固化插件与 Effect 依赖", () => {
+test("生成运行时 manifest 由宿主管理 SDK，保留已有声明并补齐直接依赖", () => {
   const target = createTarget()
   try {
     build(target)
     assert.deepEqual(readJson(join(target, ".opencode", "package.json")).dependencies, {
-      "@opencode-ai/plugin": "1.18.21",
       effect: "4.0.0-beta.83",
       "tree-sitter-bash": "0.25.0",
       "web-tree-sitter": "0.25.10",
     })
 
     const packagePath = join(target, ".opencode", "package.json")
+    build(target)
+    assert.equal(Object.hasOwn(readJson(packagePath).dependencies, "@opencode-ai/plugin"), false)
     writeFileSync(packagePath, JSON.stringify({ dependencies: { "@opencode-ai/plugin": "1.18.29", effect: "3.22.2" } }))
     build(target)
     assert.deepEqual(readJson(packagePath).dependencies, {

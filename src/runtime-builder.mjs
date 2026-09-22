@@ -16,11 +16,10 @@ const COMPONENT = "opencode-for-everything"
 const CONFIG_DIR = ".o4e"
 const PLUGIN_FILE = `${COMPONENT}.ts`
 const RUNTIME_COMPONENT_DIRECTORY = "opencode-for-everything"
-// These packages are loaded by the copied runtime, not by the installer
-// process.  Keep them in the generated target manifest so a fresh install is
-// reproducible even when OpenCode's own dependency bootstrap is unavailable.
+// Declare O4E's direct runtime dependencies for the host to install.
+// OpenCode prepares @opencode-ai/plugin for its own version at startup;
+// the development SDK version must not become a runtime default here.
 const RUNTIME_DEPENDENCIES = {
-  "@opencode-ai/plugin": "1.18.21",
   effect: "4.0.0-beta.83",
   "tree-sitter-bash": "0.25.0",
   "web-tree-sitter": "0.25.10",

@@ -63,6 +63,8 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 
 `build` 校验配置和内部 managed Skill registry，并生成 `.opencode/agents/` 与 `.opencode/plugins/`，不修改 `.o4e/` 或公共 `.opencode/skills/`。Skill 由插件直接从 `.o4e/skills/` 注册。全局 `build` 不注册插件，注册仅发生在全局安装或导入时。
 
+构建只声明 Effect 和 Bash 解析器等 O4E 直接运行依赖，不执行依赖安装，也不为 `@opencode-ai/plugin` 补入默认版本；SDK 由 OpenCode 在启动时准备。目标 `package.json` 已有的 SDK 和 Effect 声明会保留，不被构建删除或覆盖。仓库开发 SDK 的固定版本不是用户运行目录的版本锁。内网仍需让宿主的包管理器能够访问所需包；声明依赖不等于已安装，也不保证离线就绪。
+
 ## 原生 Agent 策略
 
 安装配置中的 `nativeAgents` 固定包含四项：

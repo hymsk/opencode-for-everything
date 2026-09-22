@@ -440,7 +440,6 @@ test("Bash build propagates pinned runtime parser dependencies and preserves tar
   assert.deepEqual(JSON.parse(readFileSync(packagePath, "utf8")), {
     ...original,
     dependencies: {
-      "@opencode-ai/plugin": "1.18.21",
       effect: "4.0.0-beta.83",
       ...original.dependencies,
       ...parserDependencies,
