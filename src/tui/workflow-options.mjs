@@ -6,9 +6,10 @@ import { stripJsonComments } from "../jsonc.mjs"
 
 // Read only the selected config at startup, never Session checkpoints or stale
 // build flags. Share server root precedence; invalid projects never fall back.
+// origin 关闭 Workflow 入口；其余取值（含不受支持的值）与 default 一致，由 server 插件统一诊断。
 export function runtimeWorkflowOptions(options, env = process.env, home = homedir(), directory) {
   const disabled = { enableWorkflow: false }
-  if (![undefined, "default", "clear"].includes(env.o4e_mode)
+  if (env.o4e_mode === "origin"
     || typeof directory !== "string" || !isAbsolute(directory)) return disabled
   try {
     const roots = runtimePaths(directory, resolveO4eConfigRoot(env, home), env.o4e_config !== undefined)

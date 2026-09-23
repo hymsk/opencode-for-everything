@@ -6,6 +6,12 @@ release candidates before a stable baseline.
 
 ## Unreleased
 
+- Changed `o4e_mode` invalid-value handling: an empty string or any other
+  unsupported value now falls back to `default` (O4E stays enabled) and emits
+  an `O4E_MODE_FALLBACK` error diagnostic naming the invalid value — written
+  to the host log and shown as a TUI warning toast when available — instead of
+  refusing to load the plugin. This updates the `CFG-008` contract, which
+  previously required failing closed.
 - Add the `model` CLI subcommand to modify an installed target's model
   configuration after installation: the global `defaultModel` and per-Agent
   `model` (both with optional variant, `null` restores inheritance) for

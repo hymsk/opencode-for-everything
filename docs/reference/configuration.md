@@ -184,7 +184,8 @@ provider may retry internally on its own; that happens outside the plugin's cont
 the top-level and per-Agent `model`/`variant` in the final config hook, and also disables internal
 configuration candidates and fallback. The host can still use explicit or remembered
 selections; `clear` does not modify `.o4e/`, host configuration files, credentials, or the global
-model library; an empty string is not a compatible alias and fails closed.
+model library; an empty string or any other unsupported value is treated as `default` and reported
+through an error diagnostic instead of failing startup.
 
 The post-installation configuration notes also summarize the [model configuration boundary](../../defaults/.o4e/README.md#配置规则).
 
@@ -681,7 +682,7 @@ written into configuration. O4E first denies managed servers' tools, then opens 
 
 | Variable or placeholder | Current use |
 | --- | --- |
-| `o4e_mode` | unset or `default` enables O4E; `origin` returns a clean host projection; `clear` keeps the O4E projection but removes top-level and Agent `model`/`variant` from this run's final runtime configuration; empty string and other values are rejected outright. The value is read when the plugin instance is created. |
+| `o4e_mode` | unset or `default` enables O4E; `origin` returns a clean host projection; `clear` keeps the O4E projection but removes top-level and Agent `model`/`variant` from this run's final runtime configuration; an empty string or any other value falls back to `default` while emitting an error diagnostic naming the invalid value (host log, plus a TUI warning toast when available). The value is read when the plugin instance is created. |
 | `o4e_config` | when set explicitly to an absolute path (supporting the `~/` prefix), only that directory is read; when unset, the default global root is `~/.config/opencode/.o4e/`, with project `.o4e/` still taking precedence. Frozen within the plugin instance; the new value is read only after restarting OpenCode (including a new `-s` process). |
 | `XDG_CONFIG_HOME` | Runtime uses it to resolve the global configuration root only when it is an absolute path; the installer's global target remains fixed at `~/.config/opencode`. |
 | `{env:VAR_NAME}` | reads environment variables in configuration values such as MCP headers, avoiding writing credentials into files. |

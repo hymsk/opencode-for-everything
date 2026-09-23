@@ -920,10 +920,13 @@ export function buildRuntime({ target, global = false }) {
   for (const file of sourceRuntimeFiles()) {
     let content = readFileSync(file.source, "utf8")
     // TUI modules live outside server auto-discovery after installation. Keep
-    // their two shared, side-effect-free helpers pointing at the copied source.
+    // their shared, side-effect-free helpers pointing at the copied source.
     if (file.relativePath.replaceAll("\\", "/") === "tui/workflow-options.mjs") {
       content = content.replace('"../config-paths.mjs"', '"../../plugins/opencode-for-everything/config-paths.mjs"')
         .replace('"../jsonc.mjs"', '"../../plugins/opencode-for-everything/jsonc.mjs"')
+    }
+    if (file.relativePath.replaceAll("\\", "/") === "tui/index.tsx") {
+      content = content.replace('"../run-mode.mjs"', '"../../plugins/opencode-for-everything/run-mode.mjs"')
     }
     expected.set(runtimeModulePath(runtimeRoot, file.relativePath), content)
   }

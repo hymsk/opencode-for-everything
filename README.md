@@ -147,7 +147,7 @@ o4e_mode=clear opencode
 
 `clear` does not delete models, credentials, or saved host model preferences, nor does it reset the model already selected for a Session. The host may still use explicit or remembered selections. `origin` is not an uninstall and does not disable other plugins.
 
-The mode is read when the plugin instance is created, so restart OpenCode after changing it. Values must use the lowercase names above; an empty string or any other value produces an error rather than silently falling back.
+The mode is read when the plugin instance is created, so restart OpenCode after changing it. Values use the lowercase names above; an empty string or any other value falls back to `default` and emits an error diagnostic naming the invalid value (host log, plus a TUI warning toast when available).
 
 You can also select a different configuration with `o4e_config`, combined with a startup mode:
 

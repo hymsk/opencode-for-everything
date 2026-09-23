@@ -40,6 +40,7 @@ import { latestUserPromptContext, messageModel } from "./message-model.mjs"
 import { AGENT_TASK_TOOL, collectMcpServerNames, effectiveAgentPermission, legalAgentCandidates, permissionAction, TASK_TOOL, WORKFLOW_TOOL } from "../../core/agent-routing.mjs"
 import { isActionableTaskStatus, isTerminalTaskStatus } from "../../core/background-task-domain.mjs"
 import { normalizeOpenCodeEvent } from "./event-normalizer.mjs"
+import { invalidO4eModeMessage, invalidO4eModeValue as findInvalidO4eModeValue, resolveO4eMode } from "../../run-mode.mjs"
 import { loadRuntimeDefinition } from "../../runtime-builder.mjs"
 import { configRootExists, runtimePaths, resolveO4eConfigRoot } from "../../config-paths.mjs"
 export { resolveO4eConfigRoot } from "../../config-paths.mjs"
@@ -841,13 +842,10 @@ export function resolveSessionDirectory(directory?: string, worktree?: string): 
   return canonicalDirectoryKey(directory || worktree || process.cwd())
 }
 
-/** O4E is enabled by default; origin returns the original host and clear removes runtime model selection. */
-export function resolveO4eMode(env = process.env): "default" | "origin" | "clear" {
-  const value = env.o4e_mode
-  if (value === undefined || value === "default") return "default"
-  if (value === "origin") return "origin"
-  if (value === "clear") return "clear"
-  throw new Error("O4E_MODE_INVALID: o4e_mode must be 'default', 'origin', or 'clear'")
+/** O4E is enabled by default; origin returns the original host and clear removes runtime model selection. Unsupported values fall back to default with a diagnostic (CFG-008). */
+export { resolveO4eMode }
+export function invalidO4eModeValue(env = process.env): string | undefined {
+  return findInvalidO4eModeValue(env)
 }
 
 function cleanDisabledAgentProjection(config: any, directory?: string): void {
@@ -1202,6 +1200,15 @@ export async function createOpenCodeHooks({ client, directory, worktree, command
   const o4eMode = resolveO4eMode()
   if (o4eMode === "origin") {
     return { config: async (config: any) => cleanDisabledAgentProjection(config, directory ?? worktree) }
+  }
+  const invalidModeValue = invalidO4eModeValue()
+  if (invalidModeValue !== undefined) {
+    // 持久诊断写宿主日志（fire-and-forget，绝不阻塞插件初始化）；屏幕上的 toast
+    // 由 TUI 端插件在 UI 就绪后本地弹出（见 tui/index.tsx），不受服务端事件桥时序影响。
+    const message = invalidO4eModeMessage(invalidModeValue)
+    try {
+      void Promise.resolve(client?.app?.log?.({ body: { service: "opencode-for-everything", level: "error", message } })).catch(() => {})
+    } catch { /* 日志记录尽力而为 */ }
   }
   const configuredRoot = resolveO4eConfigRoot()
   const explicitConfig = process.env.o4e_config !== undefined

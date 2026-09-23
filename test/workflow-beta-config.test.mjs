@@ -86,9 +86,11 @@ test("TUI Beta uses selected project/explicit/global config, never stale build o
     assert.equal(selected({}, { o4e_config: globalRoot }), !enabled)
     assert.equal(selected({}, { o4e_config: "~/.config/opencode/.o4e" }), !enabled)
   }
-  for (const env of [{ o4e_mode: "origin" }, { o4e_mode: "invalid" }, { o4e_config: "" }, { o4e_config: "relative" }, { o4e_config: join(home, "missing") }]) {
+  for (const env of [{ o4e_mode: "origin" }, { o4e_config: "" }, { o4e_config: "relative" }, { o4e_config: join(home, "missing") }]) {
     assert.equal(selected({ enableWorkflow: true }, env), false)
   }
+  // 非法 o4e_mode 与 default 一致：正常读取选定配置（此处 projectRoot 为 true）
+  assert.equal(selected({ enableWorkflow: false }, { o4e_mode: "invalid" }), true)
   save(globalRoot, true)
   writeFileSync(join(projectRoot, "config.jsonc"), "invalid")
   writeFileSync(join(projectRoot, "config.json"), '{"enableWorkflow":true}')

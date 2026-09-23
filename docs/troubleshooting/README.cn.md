@@ -93,8 +93,9 @@ Prompt、Soul 和受管 instruction files 会在下一次相关 system 组装时
 
 如果需要排除宿主保存模型对本次运行的影响，使用 `o4e_mode=clear` 启动新进程；它只
 清除本次最终运行时配置投影，不修改宿主配置文件、凭据或模型库。需要完全不初始化 O4E
-Runtime 时使用 `o4e_mode=origin`。空字符串模式已移除，会直接报
-`O4E_MODE_INVALID`。核验实际行为时检查最终 config 和 provider 请求，不使用模型自述。
+Runtime 时使用 `o4e_mode=origin`。空字符串或其他非法值不会阻止启动：O4E 回退为
+`default` 继续，同时输出 `O4E_MODE_FALLBACK` 错误诊断（宿主日志，TUI 可用时弹出警告）。
+核验实际行为时检查最终 config 和 provider 请求，不使用模型自述。
 
 ### MCP 已连接但 Agent 没有工具
 

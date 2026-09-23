@@ -588,7 +588,7 @@ local MCP 的 `command` 是非空字符串数组。密钥使用 `{env:VAR_NAME}`
 
 | 变量或占位符 | 当前用途 |
 | --- | --- |
-| `o4e_mode` | 未设置或为 `default` 时启用 O4E；`origin` 返回干净宿主投影；`clear` 保留 O4E 投影但清除本次最终运行时配置中的顶层和 Agent `model`/`variant`；空字符串和其他值直接拒绝。该值在插件实例创建时读取。 |
+| `o4e_mode` | 未设置或为 `default` 时启用 O4E；`origin` 返回干净宿主投影；`clear` 保留 O4E 投影但清除本次最终运行时配置中的顶层和 Agent `model`/`variant`；空字符串和其他值回退为 `default`，同时输出包含该非法值的错误诊断（宿主日志，TUI 可用时弹出警告）。该值在插件实例创建时读取。 |
 | `o4e_config` | 显式设置为绝对路径（支持前缀 `~/`）时仅从该目录读取；未设置时默认全局根为 `~/.config/opencode/.o4e/`，并保留项目 `.o4e/` 优先。插件实例内冻结，重新启动 OpenCode（包括新的 `-s` 进程）后才读取新值。 |
 | `XDG_CONFIG_HOME` | Runtime 仅在它是绝对路径时用其解析全局配置根；安装器的全局目标仍固定为 `~/.config/opencode`。 |
 | `{env:VAR_NAME}` | 在 MCP header 等配置值中读取环境变量，避免把凭据写入文件。 |

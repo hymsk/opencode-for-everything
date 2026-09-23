@@ -42,7 +42,7 @@ Prompt、instruction file、Plan reminder 和 Soul 正文会在下一次相关�
 
 运行时环境变量：`o4e_mode` 未设置或为 `default` 时启用 O4E；`origin` 使用干净的
 OpenCode 投影；`clear` 保留 O4E 能力，但从本次最终运行时配置中清除顶层和 Agent 的
-`model`/`variant`。空字符串和其他值拒绝加载。模式不会修改 `.o4e/`、凭据或宿主模型库。`o4e_config` 显式
+`model`/`variant`。空字符串和其他值回退为 `default`，同时输出包含该非法值的错误诊断（宿主日志，TUI 可用时弹出警告）。模式不会修改 `.o4e/`、凭据或宿主模型库。`o4e_config` 显式
 设置为绝对路径（支持 `~/`）时只读取该配置目录；未设置时项目 `.o4e/` 优先，
 默认全局目录为 `~/.config/opencode/.o4e/`。变量在一次 OpenCode 进程内固定，
 修改后须重新启动；`opencode -s` 作为新进程按当前变量读取。

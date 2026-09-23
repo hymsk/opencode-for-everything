@@ -145,7 +145,9 @@ To exclude a host-saved model from the current run, start a new process with
 `o4e_mode=clear`; this clears only the final runtime configuration projection
 and does not modify host configuration, credentials, or the model library. Use
 `o4e_mode=origin` when O4E Runtime should not be initialized at all. An empty
-mode has been removed and reports `O4E_MODE_INVALID`. Check the final config
+or otherwise invalid mode does not block startup: O4E falls back to `default`
+and reports an `O4E_MODE_FALLBACK` error diagnostic (host log, plus a TUI
+warning toast when available). Check the final config
 and provider request when verifying behavior; do not rely on a model's
 self-description.
 

@@ -7,6 +7,7 @@ import type { BoxRenderable, ScrollBoxRenderable, SelectRenderable } from "@open
 import { adjacentCommand, outputScreenMove, commandSource, commandOutput, commandPreview, commandListItem, outputPage, navigateTask, projectTaskOverview, registerTaskOverview, registerTaskListPaging, taskNavigationTarget } from "./task-overview.mjs"
 import { projectWorkflowOverview, workflowEnabled, workflowSidebar, workflowPage, workflowListItem, registerTuiOverviewCommands } from "./workflow-overview.mjs"
 import { runtimeWorkflowOptions } from "./workflow-options.mjs"
+import { invalidO4eModeMessage, invalidO4eModeValue } from "../run-mode.mjs"
 
 type ViewProps = { api: TuiPluginApi; session_id: string; workflowEnabled?: boolean }
 const currentOwner = (props: ViewProps) => props.api.route.current.name === "session"
@@ -343,6 +344,23 @@ function Overview(props: ViewProps) {
 const plugin: TuiPluginModule & { id: string } = {
   id: "opencode-for-everything.tasks",
   tui: async (api, options) => {
+    // CFG-008：非法 o4e_mode 已回退为 default。插件加载早于 UI 就绪，toast 须等
+    // state.ready 后本地弹出（不经过服务端事件桥），确保用户真实看到；插件释放即停止。
+    const invalidMode = invalidO4eModeValue(process.env)
+    if (invalidMode !== undefined) {
+      const message = invalidO4eModeMessage(invalidMode)
+      let attempts = 0
+      const timer = setInterval(() => {
+        attempts += 1
+        if (attempts > 160 || api.lifecycle.signal.aborted) { clearInterval(timer); return }
+        if (!api.state.ready) return
+        clearInterval(timer)
+        try {
+          api.ui.toast({ title: "O4E", message, variant: "warning", duration: 15000 })
+        } catch { /* 提示尽力而为 */ }
+      }, 250)
+      api.lifecycle.onDispose(() => clearInterval(timer))
+    }
     const selectedOptions = runtimeWorkflowOptions(options, process.env, undefined, api.state.path.directory)
     const enabled = workflowEnabled(selectedOptions)
     registerTaskOverview(api, (sessionID: string) => <Overview api={api} session_id={sessionID} workflowEnabled={enabled} />)

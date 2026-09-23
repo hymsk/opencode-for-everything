@@ -7,17 +7,53 @@ import { homedir } from "node:os"
 import test from "node:test"
 import { copyInstalledDefaults, readConfigJson, resolveConfigPath, writeConfigJson } from "./helpers/o4e-fixture.mjs"
 import { OpenCodeForEverythingPlugin } from "../src/plugin.ts"
-import { resolveO4eConfigRoot, resolveO4eMode } from "../src/adapters/opencode/plugin-hooks.ts"
+import { resolveO4eConfigRoot, resolveO4eMode, invalidO4eModeValue } from "../src/adapters/opencode/plugin-hooks.ts"
 
 const componentRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
-test("o4e_mode 仅接受 default、origin 或 clear，未设置时默认启用", () => {
+test("o4e_mode 接受 default、origin、clear；非法值回退 default 并可诊断", () => {
   assert.equal(resolveO4eMode({}), "default")
   assert.equal(resolveO4eMode({ o4e_mode: "default" }), "default")
   assert.equal(resolveO4eMode({ o4e_mode: "origin" }), "origin")
   assert.equal(resolveO4eMode({ o4e_mode: "clear" }), "clear")
   for (const value of ["", "DEFAULT", "disabled", " ", "1"]) {
-    assert.throws(() => resolveO4eMode({ o4e_mode: value }), /O4E_MODE_INVALID/)
+    assert.equal(resolveO4eMode({ o4e_mode: value }), "default")
+    assert.equal(invalidO4eModeValue({ o4e_mode: value }), value)
+  }
+  for (const value of [undefined, "default", "origin", "clear"]) {
+    assert.equal(invalidO4eModeValue(value === undefined ? {} : { o4e_mode: value }), undefined)
+  }
+})
+
+test("非法 o4e_mode 回退 default 启用 O4E 并输出日志诊断", async () => {
+  const target = mkdtempSync(join(tmpdir(), "o4e-mode-fallback-"))
+  const previous = process.env.o4e_mode
+  try {
+    copyInstalledDefaults(componentRoot, target)
+    process.env.o4e_mode = ""
+    const logs = []
+    const client = {
+      app: { log: async ({ body }) => { logs.push(body); return { data: true } } },
+    }
+    const hooks = await OpenCodeForEverythingPlugin({ client, directory: target, worktree: target })
+    assert.equal(logs.length, 1)
+    assert.equal(logs[0].service, "opencode-for-everything")
+    assert.equal(logs[0].level, "error")
+    assert.match(logs[0].message, /O4E_MODE_FALLBACK/)
+    assert.match(logs[0].message, /o4e_mode=""/)
+    // 回退 default：受管投影生效，而不是 origin 的干净宿主
+    const config = { agent: {} }
+    await hooks.config(config)
+    assert.ok(config.agent.orchestrator)
+    await hooks.dispose()
+    // disposed 后的事件不进入 Runtime 恢复，也不重复记录诊断
+    await hooks.event({ event: { type: "session.idle", properties: { sessionID: "ses_test" } } })
+    assert.equal(logs.length, 1, "日志诊断只记录一次")
+    await hooks.dispose()
+  } finally {
+    if (previous === undefined) delete process.env.o4e_mode
+    else process.env.o4e_mode = previous
+    rmSync(target, { recursive: true, force: true })
   }
 })
 
