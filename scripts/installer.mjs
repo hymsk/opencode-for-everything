@@ -15,6 +15,7 @@
  *   node scripts/installer.mjs status --target /path/to/project # Check project installation status
  *   node scripts/installer.mjs export backup.o4e.tar.gz --target /path/to/project
  *   node scripts/installer.mjs import backup.o4e.tar.gz --target /path/to/project --force
+ *   node scripts/installer.mjs model --no-tui --target /path/to/project --default-model=provider/model
  */
 
 import { parseArgs, promisify } from "node:util"
@@ -31,6 +32,7 @@ import { globalPluginRegistered, installGlobalPlugin, prepareGlobalPluginRegistr
 import { readManagedSkills } from "../src/managed-skills.mjs"
 import { expandPlanProfiles } from "../src/core/capability-policy.mjs"
 import { prepareTuiRegistrationRemoval, runtimeModulePath, tuiPluginRegistered } from "../src/tui-registration.mjs"
+import { applyModelChanges, formatModelValue, modelConfigRoot, parseModelCliOptions, readModelConfiguration } from "./model-config.mjs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const execFileAsync = promisify(execFile)
@@ -303,6 +305,10 @@ const DEFAULT_ARGS = {
   "native-plan": undefined,
   "native-general": undefined,
   "native-explore": undefined,
+  "default-model": undefined,
+  "default-variant": undefined,
+  model: undefined,
+  variant: undefined,
   help: false,
 }
 let args = DEFAULT_ARGS
@@ -326,6 +332,10 @@ if (IS_MAIN) {
         "native-plan": { type: "string" },
         "native-general": { type: "string" },
         "native-explore": { type: "string" },
+        "default-model": { type: "string" },
+        "default-variant": { type: "string" },
+        "model": { type: "string", multiple: true },
+        "variant": { type: "string", multiple: true },
         "help": { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -333,7 +343,7 @@ if (IS_MAIN) {
     })
     args = parsed.values
     command = parsed.positionals[0]
-    if (command && !["install", "uninstall", "status", "build", "export", "import"].includes(command)) {
+    if (command && !["install", "uninstall", "status", "build", "export", "import", "model"].includes(command)) {
       console.error(`Unsupported command: ${command}`)
       process.exit(2)
     }
@@ -379,7 +389,7 @@ if (IS_MAIN && args.global && hasTargetArgument) {
   process.exit(2)
 }
 if (IS_MAIN && !args.help && !command) {
-  console.error("A subcommand is required: install, uninstall, status, build, export, or import")
+  console.error("A subcommand is required: install, uninstall, status, build, export, import, or model")
   process.exit(2)
 }
 if (IS_MAIN && ["status", "build"].includes(command) && !args.global && !hasTargetArgument) {
@@ -388,6 +398,15 @@ if (IS_MAIN && ["status", "build"].includes(command) && !args.global && !hasTarg
 }
 if (IS_MAIN && hasNativePolicyArgument && command !== "install") {
   console.error("Native Agent policy options are only supported by install")
+  process.exit(2)
+}
+const hasModelArgument = ["default-model", "default-variant", "model", "variant"].some(hasArgument)
+if (IS_MAIN && hasModelArgument && command !== "model") {
+  console.error("Model options are only supported by the model subcommand")
+  process.exit(2)
+}
+if (IS_MAIN && command === "model" && (args.force || args["no-soul"])) {
+  console.error("The model subcommand only supports --target/--global, --no-tui, --lang and model options")
   process.exit(2)
 }
 if (IS_MAIN && hasSkillArgument && command !== "install") {
@@ -418,12 +437,13 @@ Commands:
   build              Validate .o4e/ and rebuild the runtime entry point
   export <archive>   Export .o4e configuration to a .o4e.tar.gz archive
   import <archive>   Import a .o4e.tar.gz archive and rebuild the runtime
+  model              Modify installed model configuration and rebuild
 
 Options:
   --no-tui          Silent mode (no interactive interface)
   --lang=<language> Language: zh or en (default: en)
   --no-soul         Disable SOUL.md (enabled by default)
-  --target=<dir>    Target directory for install, build, uninstall, or status;
+  --target=<dir>    Target directory for install, build, uninstall, status, or model;
                     required for project-level build and status
   --global          Use the global directory (~/.config/opencode)
   --force           Overwrite existing configuration
@@ -439,6 +459,14 @@ Options:
                     Override one native Agent after applying the preset;
                     repeat this option for multiple overrides. Custom requires
                     all four values in silent mode.
+  --default-model=<provider/model|null>
+                    model subcommand: set or clear config defaultModel
+  --default-variant=<name|null>
+                    model subcommand: set or remove the defaultModel variant
+  --model=<agent>=<provider/model|null>
+                    model subcommand: set or clear one Agent model; repeatable
+  --variant=<agent>=<name|null>
+                    model subcommand: set or remove one Agent model variant; repeatable
   --help, -h        Show this help
 
 Examples:
@@ -456,6 +484,11 @@ Examples:
    node scripts/installer.mjs status --global
    node scripts/installer.mjs export backup.o4e.tar.gz --target=./my-project
    node scripts/installer.mjs import backup.o4e.tar.gz --target=./my-project --force
+   node scripts/installer.mjs model                             # Interactive model configuration
+   node scripts/installer.mjs model --global                    # Interactive model configuration (global)
+   node scripts/installer.mjs model --no-tui --target=./my-project --default-model=anthropic/claude-sonnet-4-5
+   node scripts/installer.mjs model --no-tui --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
+   node scripts/installer.mjs model --no-tui --model=chat=null  # Clear one Agent model (inherit)
 `)
 }
 
@@ -534,6 +567,20 @@ const TEXTS = {
     uninstalling: "正在卸载...",
     uninstallComplete: "卸载完成",
     uninstallFailed: "卸载失败",
+    // 模型配置相关
+    modelWelcome: "opencode-for-everything 模型配置",
+    modelSelectScope: "选择要修改的配置范围",
+    modelCurrent: "当前模型配置",
+    modelDefaultTarget: "全局默认模型 (defaultModel)",
+    modelInherit: "继承全局默认",
+    modelHostCurrent: "沿用 OpenCode 当前模型",
+    modelSelectTarget: "选择要修改的条目",
+    modelTargetDone: "完成并应用",
+    modelNoChanges: "没有需要应用的修改",
+    modelApplying: "正在写入配置并重建运行时...",
+    modelApplied: "模型配置已更新",
+    modelFailed: "模型配置失败",
+    modelPending: "待应用",
   },
   en: {
     welcome: "Welcome to opencode-for-everything Installer",
@@ -608,6 +655,20 @@ This helps AI understand you better and provide more personalized service.`,
     uninstalling: "Uninstalling...",
     uninstallComplete: "Uninstall complete",
     uninstallFailed: "Uninstall failed",
+    // Model configuration related
+    modelWelcome: "opencode-for-everything Model Configuration",
+    modelSelectScope: "Select the configuration scope to modify",
+    modelCurrent: "Current model configuration",
+    modelDefaultTarget: "Global default model (defaultModel)",
+    modelInherit: "inherits the global default",
+    modelHostCurrent: "uses the current OpenCode model",
+    modelSelectTarget: "Select an entry to modify",
+    modelTargetDone: "Done - apply changes",
+    modelNoChanges: "No changes to apply",
+    modelApplying: "Writing configuration and rebuilding the runtime...",
+    modelApplied: "Model configuration updated",
+    modelFailed: "Model configuration failed",
+    modelPending: "pending",
   },
 }
 
@@ -1031,6 +1092,11 @@ async function runTuiInstaller() {
     const target = state.scope === "global" ? globalConfigRoot() : resolveTarget(args.target || ".")
     return lstatIfPresent(target)?.isDirectory() ? target : process.cwd()
   }
+  // INS-006：进入安装流程即对项目和全局候选范围并行后台预加载模型目录；
+  // scope 步骤与 models 步骤复用已启动的同目录任务，模型选择不再是首次触发。
+  for (const candidate of [resolveTarget(args.target || "."), globalConfigRoot()]) {
+    modelCatalogs.prefetch(lstatIfPresent(candidate)?.isDirectory() ? candidate : process.cwd())
+  }
   // Esc returns to the previous installer step. Ctrl+C remains a direct exit.
   async function ask(prompt, options) {
     let navigation
@@ -1425,6 +1491,237 @@ function runCliInstaller() {
     console.log(enableSoul ? t.soulEnabled : t.soulDisabled)
   } else {
     console.error(`\nInstallation failed: ${result.error}`)
+    process.exit(1)
+  }
+}
+
+// 静默模型配置
+function runCliModel() {
+  const t = TEXTS[args.lang] ?? TEXTS.en
+  let change
+  try {
+    change = parseModelCliOptions(args)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exit(2)
+  }
+  if (!change.touched) {
+    console.error("model requires at least one of --default-model, --default-variant, --model or --variant")
+    process.exit(2)
+  }
+  const target = args.global ? globalConfigRoot() : resolveTarget(args.target || ".")
+  try {
+    const result = applyModelChanges({
+      target,
+      global: args.global,
+      defaultModel: change.defaultModel,
+      defaultVariant: change.defaultVariant,
+      agents: change.agents,
+    })
+    if (result.changes.length === 0) {
+      console.log(t.modelNoChanges)
+      return
+    }
+    console.log(`\n${t.modelApplied} ✓`)
+    for (const entry of result.changes) {
+      console.log(`  ${entry.target}: ${formatModelValue(entry.value)}`)
+    }
+    console.log(`Runtime rebuilt: ${target}`)
+  } catch (error) {
+    console.error(`\n${t.modelFailed}: ${error.message}`)
+    process.exit(1)
+  }
+}
+
+// 交互式模型配置
+async function runTuiModel() {
+  const p = await import("@clack/prompts")
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error("Error: the interactive model configuration requires a TTY. Use --no-tui for silent mode.")
+    process.exit(1)
+  }
+  // Esc 返回条目菜单；第一步或 Ctrl+C 直接退出。
+  async function ask(prompt, options) {
+    let navigation
+    const onKeypress = (character, key) => {
+      if (key?.name === "escape" || character === "\u001b") {
+        navigation = NAVIGATE_BACK
+      } else if ((key?.ctrl && key.name === "c") || character === "\u0003") {
+        navigation = EXIT_INSTALLER
+      }
+    }
+    process.stdin.on("keypress", onKeypress)
+    try {
+      const result = await prompt(options)
+      if (p.isCancel(result)) return navigation ?? EXIT_INSTALLER
+      return result
+    } finally {
+      process.stdin.off("keypress", onKeypress)
+    }
+  }
+
+  // INS-006：进入命令即对项目和全局候选范围并行后台预加载模型目录；
+  // 语言/范围选择、阅读当前配置和浏览菜单期间目录已在加载，模型选择不再是首次触发。
+  const modelCatalogs = createModelCatalogLoader()
+  const catalogCwdFor = (directory) => (lstatIfPresent(directory)?.isDirectory() ? directory : process.cwd())
+  modelCatalogs.prefetch(catalogCwdFor(resolveTarget(args.target || ".")))
+  modelCatalogs.prefetch(catalogCwdFor(globalConfigRoot()))
+
+  // 与交互安装/卸载一致，先选择界面语言；--lang 仅作为初始值。
+  const lang = await ask(p.select, {
+    message: TEXTS.en.selectLanguage,
+    options: [
+      { value: "zh", label: TEXTS.en.langZh },
+      { value: "en", label: TEXTS.en.langEn },
+    ],
+    initialValue: args.lang === "zh" ? "zh" : "en",
+  })
+  if (lang === NAVIGATE_BACK || lang === EXIT_INSTALLER) {
+    p.cancel("Cancelled")
+    return
+  }
+  const t = TEXTS[lang]
+
+  p.intro(t.modelWelcome)
+
+  // 范围选择：未显式 --target/--global 时让用户选择项目或全局。
+  let target
+  let global = args.global
+  if (global) {
+    target = globalConfigRoot()
+  } else if (hasTargetArgument) {
+    target = resolveTarget(args.target || ".")
+  } else {
+    const projectTarget = resolveTarget(".")
+    const globalTarget = globalConfigRoot()
+    const scopeOptions = []
+    if (existsSync(join(projectTarget, ".o4e"))) scopeOptions.push({ value: "project", label: t.scopeProject, hint: projectTarget })
+    if (existsSync(join(globalTarget, ".o4e"))) scopeOptions.push({ value: "global", label: t.scopeGlobal, hint: globalTarget })
+    if (scopeOptions.length === 0) {
+      p.cancel(t.noConfigFound)
+      process.exit(1)
+    }
+    const scope = await ask(p.select, { message: t.modelSelectScope, options: scopeOptions, initialValue: scopeOptions[0].value })
+    if (scope === NAVIGATE_BACK || scope === EXIT_INSTALLER) {
+      p.cancel("Cancelled")
+      return
+    }
+    global = scope === "global"
+    target = global ? globalTarget : projectTarget
+  }
+  // 范围确定后立即为最终目标预加载（同目录任务幂等复用）。
+  const catalogCwd = catalogCwdFor(target)
+  modelCatalogs.prefetch(catalogCwd)
+
+  let state
+  try {
+    state = readModelConfiguration(modelConfigRoot({ target, global }))
+  } catch (error) {
+    p.cancel(error instanceof Error ? error.message : String(error))
+    process.exit(1)
+  }
+
+  p.log.message(`\n${t.modelCurrent}:`)
+  p.log.message(`  defaultModel: ${formatModelValue(state.defaultModel, { inherit: t.modelHostCurrent })}`)
+  for (const agent of state.agents) {
+    p.log.message(`  ${agent.name} (${agent.type}): ${formatModelValue(agent.model, { inherit: t.modelInherit })}`)
+  }
+
+  const DEFAULT_KEY = "__default__"
+  const DONE_KEY = "__done__"
+  const changes = new Map()
+  const describe = (key, current, nullText) => {
+    if (changes.has(key)) {
+      const change = changes.get(key)
+      return `${t.modelPending}: ${change.model === null ? nullText : formatModelValue({ id: change.model, ...(change.variant ? { variant: change.variant } : {}) })}`
+    }
+    return formatModelValue(current, { inherit: nullText })
+  }
+
+  for (;;) {
+    const options = [
+      { value: DEFAULT_KEY, label: t.modelDefaultTarget, hint: describe(DEFAULT_KEY, state.defaultModel, t.modelHostCurrent) },
+      ...state.agents.map((agent) => ({
+        value: agent.name,
+        label: `${agent.name} (${agent.type})`,
+        hint: describe(agent.name, agent.model, t.modelInherit),
+      })),
+      { value: DONE_KEY, label: t.modelTargetDone },
+    ]
+    const picked = await ask(p.select, { message: t.modelSelectTarget, options, initialValue: DEFAULT_KEY })
+    if (picked === EXIT_INSTALLER) {
+      p.cancel("Cancelled")
+      return
+    }
+    if (picked === NAVIGATE_BACK || picked === DONE_KEY) break
+
+    const task = modelCatalogs.prefetch(catalogCwd)
+    const spinner = task.pending ? p.spinner() : null
+    spinner?.start(t.loadingModels)
+    const models = await task.promise
+    spinner?.stop(`${t.modelsLoaded}: ${models.length}`)
+
+    const agent = state.agents.find((item) => item.name === picked)
+    const current = picked === DEFAULT_KEY ? state.defaultModel : agent.model
+    const pending = changes.get(picked)
+    const previous = pending !== undefined
+      ? (pending.model === null ? null : { id: pending.model, variant: pending.variant })
+      : (typeof current === "string" ? { id: current } : current)
+    const model = await selectModel(ask, p, models, picked === DEFAULT_KEY ? t.selectDefaultModel : `${t.selectModel} (${picked})`, previous?.id, t)
+    if (model === NAVIGATE_BACK) continue
+    if (model === EXIT_INSTALLER) {
+      p.cancel("Cancelled")
+      return
+    }
+    let variant
+    if (model) {
+      const variants = models.find((item) => item.id === model)?.variants
+      if (variants?.length) {
+        variant = await ask(p.select, {
+          message: `${t.selectVariant} (${picked})`,
+          options: variants.map((value) => ({ value, label: value })),
+          initialValue: previous?.id === model && variants.includes(previous.variant) ? previous.variant : variants.includes("high") ? "high" : variants[0],
+        })
+        if (variant === NAVIGATE_BACK) continue
+        if (variant === EXIT_INSTALLER) {
+          p.cancel("Cancelled")
+          return
+        }
+      }
+    }
+    changes.set(picked, { model, variant })
+  }
+
+  if (changes.size === 0) {
+    p.log.message(t.modelNoChanges)
+    p.outro(t.modelNoChanges)
+    return
+  }
+
+  let defaultModel
+  let defaultVariant
+  const agentChanges = []
+  for (const [key, change] of changes) {
+    if (key === DEFAULT_KEY) {
+      defaultModel = change.model
+      defaultVariant = change.variant
+    } else {
+      agentChanges.push({ name: key, model: change.model, variant: change.variant })
+    }
+  }
+
+  const spinner = p.spinner()
+  spinner.start(t.modelApplying)
+  try {
+    const result = applyModelChanges({ target, global, defaultModel, defaultVariant, agents: agentChanges })
+    spinner.stop(`${t.modelApplied} ✓`)
+    for (const entry of result.changes) {
+      p.log.message(`  ${entry.target}: ${formatModelValue(entry.value, { inherit: t.modelHostCurrent })}`)
+    }
+    p.outro(`${t.modelApplied} ✓\n${t.installPath}: ${target}`)
+  } catch (error) {
+    spinner.stop(t.modelFailed)
+    p.cancel(`${t.modelFailed}: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(1)
   }
 }
@@ -2135,6 +2432,13 @@ if (IS_MAIN && command === "status") {
 } else if (IS_MAIN && command === "install") {
   runTuiInstaller().catch((error) => {
     console.error("Installer error:", error)
+    process.exit(1)
+  })
+} else if (IS_MAIN && command === "model" && args["no-tui"]) {
+  runCliModel()
+} else if (IS_MAIN && command === "model") {
+  runTuiModel().catch((error) => {
+    console.error("Model configuration error:", error)
     process.exit(1)
   })
 }

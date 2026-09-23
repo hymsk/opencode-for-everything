@@ -493,6 +493,101 @@ test("install 命令进入安装流程", () => {
   }
 })
 
+// 交互安装需要支持 models 输出的假 opencode binary；Windows CI 使用真实 opencode，跳过。
+test("交互安装在进入流程即预加载模型目录且全程不重复加载", { skip: process.platform === "win32" }, () => {
+  const root = mkdtempSync(join(tmpdir(), "o4e-install-prefetch-"))
+  const target = join(root, "project")
+  const home = join(root, "home")
+  const fakeBin = join(root, "bin")
+  mkdirSync(target)
+  mkdirSync(home)
+  mkdirSync(fakeBin)
+  try {
+    const promptData = `var Hi=\`You are the deterministic OpenCode test prompt\`
+var PlanReminder=\`<system-reminder>
+# Plan Mode - System Reminder
+Deterministic test reminder
+</system-reminder>
+\``
+    writeFileSync(join(fakeBin, "opencode"), `#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf '%s\\n' 9.9.1
+  exit 0
+fi
+if [ "$1" = "models" ]; then
+  printf 'called\\n' >> "$O4E_TEST_MODELS_MARKER"
+  printf 'anthropic/claude-sonnet-4-5\\n{"name":"Claude","variants":{"high":{},"max":{}}}\\n'
+  exit 0
+fi
+exit 1
+: <<'O4E_TEST_PROMPTS'
+${promptData}
+O4E_TEST_PROMPTS
+`)
+    chmodSync(join(fakeBin, "opencode"), 0o755)
+
+    const modelsMarker = join(root, "models-called.txt")
+    const env = { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ""}`, HOME: home, USERPROFILE: home, O4E_TEST_MODELS_MARKER: modelsMarker }
+
+    // 完整交互答案：语言、范围、预设、主/子 Agent、Skill、模型模式、默认模型、variant、SOUL、确认
+    const answers = ["zh", "project", "o4e-only", ["orchestrator"], ["tester"], [], "all", "anthropic/claude-sonnet-4-5", "high", false, true]
+    const prompts = `
+      import assert from "node:assert/strict";
+      import { existsSync, readFileSync } from "node:fs";
+      const answers = ${JSON.stringify(answers)};
+      let prompted = false;
+      async function next(kind) {
+        if (!prompted) {
+          prompted = true;
+          // INS-006：第一个提示出现时模型目录必须已在后台预加载
+          const marker = process.env.O4E_TEST_MODELS_MARKER;
+          const deadline = Date.now() + 5000;
+          while (!existsSync(marker) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+          assert.ok(existsSync(marker), "model catalog prefetch did not start before the first prompt");
+        }
+        const value = answers.shift();
+        assert.ok(value !== undefined, "unexpected prompt: " + kind);
+        return value;
+      }
+      export const select = () => next("select");
+      export const autocomplete = () => next("autocomplete");
+      export const confirm = () => next("confirm");
+      export const multiselect = () => next("multiselect");
+      export const isCancel = () => false;
+      export const intro = () => {}, outro = () => {}, cancel = () => {};
+      export const log = { message() {}, info() {} };
+      export const spinner = () => ({ start() {}, stop() {} });
+      process.on("exit", () => {
+        assert.equal(answers.length, 0, "unused answers");
+        // 两个候选范围解析为同一目录键：预加载一次；scope 与 models 步骤复用任务，不得重复加载
+        const lines = readFileSync(process.env.O4E_TEST_MODELS_MARKER, "utf8").trim().split("\\n").filter(Boolean);
+        assert.equal(lines.length, 1, "model catalog must be loaded exactly once");
+      });
+    `
+    const promptsURL = `data:text/javascript,${encodeURIComponent(prompts)}`
+    const loader = `export function resolve(specifier, context, nextResolve) {
+      return specifier === "@clack/prompts"
+        ? { url: ${JSON.stringify(promptsURL)}, shortCircuit: true }
+        : nextResolve(specifier, context);
+    }`
+    const preload = `
+      import { register } from "node:module";
+      Object.defineProperty(process.stdin, "isTTY", { value: true });
+      Object.defineProperty(process.stdout, "isTTY", { value: true });
+      register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(loader)}`)}, import.meta.url);
+    `
+    execFileSync(
+      process.execPath,
+      ["--import", `data:text/javascript,${encodeURIComponent(preload)}`, INSTALLER, "install"],
+      { cwd: target, encoding: "utf8", timeout: 30000, env },
+    )
+    assert.deepEqual(readJsonc(join(target, ".o4e", "config.jsonc")).defaultModel, { id: "anthropic/claude-sonnet-4-5", variant: "high" })
+    assert.match(readFileSync(join(target, ".opencode", "agents", "orchestrator.md"), "utf8"), /^model: anthropic\/claude-sonnet-4-5$/m)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test("未知命令被拒绝", () => {
   const result = runInstaller(["unknown-command"])
   assert.equal(result.success, false)
@@ -509,7 +604,7 @@ test("无参数时显示帮助", () => {
 test("操作必须显式使用子命令", () => {
   const result = runInstaller(["--no-tui", "--target", tmpdir()])
   assert.equal(result.success, false)
-  assert.match(result.output, /A subcommand is required: install, uninstall, status, build, export, or import/)
+  assert.match(result.output, /A subcommand is required: install, uninstall, status, build, export, import, or model/)
 })
 
 test("不接受多余的位置参数", () => {

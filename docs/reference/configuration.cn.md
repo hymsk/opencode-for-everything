@@ -171,6 +171,8 @@ Builder 将配置模型及 variant 写入 Agent frontmatter；默认 config hook
 
 安装后配置说明也汇总了[模型配置边界](../../defaults/.o4e/README.md#配置规则)。
 
+安装后要修改这些取值，可以直接编辑上述 `.o4e/` 源文件并运行 `build`，或使用 [`model` 子命令](./cli.cn.md#模型配置)：它在保留注释的前提下编辑按优先级选定的源文件并重建运行时，校验失败时回滚。
+
 ## Canonical Permission
 
 `loadTools` 的当前合法值为：

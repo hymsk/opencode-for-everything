@@ -44,7 +44,7 @@ O4E 是一个 OpenCode 插件系统，可将 `.o4e/` 配置转换为生成的 `.
 - Agent、Plan Profile、Prompt、Skill、Soul、MCP、权限和 Workflow 配置。
 - 使用受管 `task` 进行 Agent 委派，使用全局受管 `bash` 执行直接命令任务；包含按类型区分的任务管理、Session 持久化、恢复、Effect 与 Scope Lock；
   终端回执仅适用于 Agent 任务。
-- 安装、构建、状态查看、导入、导出、全局注册和卸载。
+- 安装、构建、状态查看、导入、导出、模型配置修改、全局注册和卸载。
 
 不包含范围：
 
@@ -368,6 +368,8 @@ Workflow 工具 Schema 必须显式描述严格 StepReport、状态枚举及动�
 | `INS-004` | 构建必须声明 O4E 直接使用的 Effect 与 Bash parser 运行依赖，但不得执行依赖安装或补入 `@opencode-ai/plugin` 默认版本；运行 SDK 由宿主准备，仓库开发 SDK 固定版本不构成目标运行目录的版本锁。目标已有 SDK 和 Effect 声明必须保留，不隐式删除或覆盖。依赖声明不证明安装或离线就绪，不改变卡片与任务运行行为。 | `src/runtime-builder.mjs`; 构建与安装器测试；`docs/reference/cli.md` |
 | `INS-002` | 仓库默认值必须维护成对的 `cn`/`en` Prompt，而已安装目标在 `.o4e/prompts/` 下只能直接包含所选语言。交互安装器必须分别选择可作为主会话入口的 `all`/`primary` 与仅可委派的 `subagent`，不得把两类角色混在同一选择列表。默认 orchestrator 为 child Plan、chat 为 self Plan；专业子角色 architect 为 child Plan，researcher/reviewer 为 self Plan，debugger/tester 为普通模式。subagent 支持 self/child Plan，但展开后仍仅可委派，不产生主选择器入口。专业 Plan 默认关闭 MCP 且有效 Effect 为 read，显式能力覆盖仍遵循 AGT-005。 | 安装器实现与测试 |
 | `INS-003` | O4E 必须维护插件受管默认 Skill 的内部注册表，不能将该注册表暴露为用户配置。安装器选择必须支持全部默认值、精确重复 `--skill=<name>` 子集或 `--no-skills`；重新安装只能清理未选中的默认受管 Skill，保留用户创建的 `.o4e/skills/`，且绝不创建、检查、清理、作为 Runtime 导出或卸载公开的 `.opencode/skills/`。 | `scripts/installer.mjs`; `src/managed-skills.mjs`; `src/runtime-builder.mjs`; 安装器与构建测试 |
+| `INS-005` | CLI 必须提供 `model` 子命令修改已安装目标的模型配置：支持全局 `defaultModel` 与具体 `all`/`primary`/`subagent` Agent 的 `model`，均可携带 `variant`，`null` 恢复继承；不提供 `fallbackModels`、system Agent 和 Plan 模型的编辑入口。必须保留用户 JSONC 注释与其余配置，只编辑按既有优先级选定的配置文件（`config.jsonc` 优先于 `config.json`，Agent 文件同理）；写入后必须通过正常 Builder 重建，校验失败必须恢复原文件并报告。交互模式与交互安装/卸载一致，先选择界面语言（`--lang` 仅作为初始值），且在未指定 `--target`/`--global` 时必须让用户选择项目或全局范围；静默模式沿用现有 target/global 约定，结果提示跟随 `--lang`。不得修改 `.opencode/` 生成物、宿主模型库或凭据；修改只影响重建后的新投影，不重新吸收到已冻结的 Agent Task。 | `scripts/installer.mjs`; `scripts/model-config.mjs`; 安装器与模型配置测试 |
+| `INS-006` | 所有需要加载模型目录的交互式安装器入口（`install`、`model`）必须在进入命令后即开始后台预加载，模型选择步骤不得成为目录加载的首次触发。目标范围尚未确定时必须对项目和全局候选范围并行预加载；范围确定后以及模型选择时必须复用已启动的同目录任务，不得重复加载。 | `scripts/installer.mjs`; 安装器与模型配置测试 |
 
 ## 验证基线
 

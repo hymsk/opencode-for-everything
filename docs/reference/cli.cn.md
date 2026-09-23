@@ -21,6 +21,9 @@ node scripts/installer.mjs uninstall --no-tui --target /path/to/project
 node scripts/installer.mjs uninstall --no-tui --global
 node scripts/installer.mjs export my-config.o4e.tar.gz --target /path/to/project
 node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project --force
+node scripts/installer.mjs model --target /path/to/project
+node scripts/installer.mjs model --no-tui --target /path/to/project --default-model=anthropic/claude-sonnet-4-5
+node scripts/installer.mjs model --no-tui --global --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
 ```
 
 ## 子命令
@@ -33,6 +36,7 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 | `build` | 校验 `.o4e/` 并重建运行时 |
 | `export <归档文件>` | 导出 `.o4e/` 为 `.o4e.tar.gz` |
 | `import <归档文件>` | 导入 `.o4e.tar.gz` 并重建运行时 |
+| `model` | 修改已安装的模型配置并重建运行时 |
 
 ## 选项
 
@@ -49,6 +53,10 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 | `--native-policy=<o4e-only\|managed\|keep\|custom>` | 安装时选择四个 OpenCode 原生 Agent 的整体预设；默认 `o4e-only` |
 | `--native-build=<keep\|managed\|disable>` 等 | 覆盖单个 `build`、`plan`、`general` 或 `explore` 策略 |
 | `--native-agent <name>=<strategy>` | 以可重复参数覆盖单个策略，例如 `--native-agent build=managed` |
+| `--default-model=<provider/model\|null>` | `model` 专用；设置或清除 `config.defaultModel` |
+| `--default-variant=<name\|null>` | `model` 专用；设置或移除 `defaultModel` 的 variant |
+| `--model=<agent>=<provider/model\|null>` | `model` 专用；设置或清除单个 Agent 模型，可重复使用 |
+| `--variant=<agent>=<name\|null>` | `model` 专用；设置或移除单个 Agent 模型的 variant，可重复使用 |
 | `--help`, `-h` | 显示帮助 |
 
 ## 参数说明
@@ -57,13 +65,30 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 
 不带任何参数运行 CLI 时会显示帮助并正常退出，不会隐式开始安装。执行任何操作都必须显式提供子命令。
 
-`--native-policy`、`--native-*` / `--native-agent`、`--skill` 和 `--no-skills` 只用于 `install`。静默安装中，`custom` 必须为四个原生 Agent 都提供最终策略；交互安装会分别选择默认主 Agent（`all`/`primary`）、子 Agent 源配置（`subagent`）、默认 Skill 和原生 Agent 预设。默认入口为 `orchestrator`；可选入口为 `orchestrator`、`orchestrator (plan)` 和只读纯对话 `chat (plan)`。Chat 不加载工具或其他角色，不能委派或运行 Workflow；专业角色展开后仍只作为子 Agent，其中 `architect` 为 child Plan、`reviewer`/`researcher` 为 self Plan。仅选择 self 主角色时，安装器将展开后的 `(plan)` 名称写入 `defaultAgent`。
+`--native-policy`、`--native-*` / `--native-agent`、`--skill` 和 `--no-skills` 只用于 `install`；`--default-model`、`--default-variant`、`--model` 和 `--variant` 只用于 `model`。静默安装中，`custom` 必须为四个原生 Agent 都提供最终策略；交互安装会分别选择默认主 Agent（`all`/`primary`）、子 Agent 源配置（`subagent`）、默认 Skill 和原生 Agent 预设。默认入口为 `orchestrator`；可选入口为 `orchestrator`、`orchestrator (plan)` 和只读纯对话 `chat (plan)`。Chat 不加载工具或其他角色，不能委派或运行 Workflow；专业角色展开后仍只作为子 Agent，其中 `architect` 为 child Plan、`reviewer`/`researcher` 为 self Plan。仅选择 self 主角色时，安装器将展开后的 `(plan)` 名称写入 `defaultAgent`。
 
 ## 状态、构建和卸载
 
 `build` 校验配置和内部 managed Skill registry，并生成 `.opencode/agents/` 与 `.opencode/plugins/`，不修改 `.o4e/` 或公共 `.opencode/skills/`。Skill 由插件直接从 `.o4e/skills/` 注册。全局 `build` 不注册插件，注册仅发生在全局安装或导入时。
 
 构建只声明 Effect 和 Bash 解析器等 O4E 直接运行依赖，不执行依赖安装，也不为 `@opencode-ai/plugin` 补入默认版本；SDK 由 OpenCode 在启动时准备。目标 `package.json` 已有的 SDK 和 Effect 声明会保留，不被构建删除或覆盖。仓库开发 SDK 的固定版本不是用户运行目录的版本锁。内网仍需让宿主的包管理器能够访问所需包；声明依赖不等于已安装，也不保证离线就绪。
+
+## 模型配置
+
+`model` 修改已安装 `.o4e/` 源中的模型字段并重建运行时，使生成的 Agent frontmatter 保持一致，无需手工编辑 JSONC。支持全局 `defaultModel` 和每个具体 `all`/`primary`/`subagent` Agent 的 `model`，均可携带可选 variant；`null` 清除取值并恢复继承（Agent 继承全局默认，全局默认为 null 时沿用 OpenCode 当前选择）。`fallbackModels`、system Agent 和 Plan Profile 不在此编辑——Plan 继承源 Agent 模型。继承语义见[配置参考](./configuration.cn.md#模型选择与运行模式)。
+
+静默模式使用显式参数，且至少需要一个：
+
+```bash
+node scripts/installer.mjs model --no-tui --target /path/to/project --default-model=anthropic/claude-sonnet-4-5 --default-variant=high
+node scripts/installer.mjs model --no-tui --target /path/to/project --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
+node scripts/installer.mjs model --no-tui --target /path/to/project --model=chat=null
+node scripts/installer.mjs model --no-tui --global --default-model=null
+```
+
+交互模式（不带 `--no-tui`）与安装器一样先选择界面语言（`--lang` 仅作为初始值），显示当前取值，并允许在一次会话中依次修改默认模型和多个 Agent。模型目录在进入命令后即在后台预加载（目标范围确定后立即开始），与安装器一致，通常选中条目时目录已就绪。未提供 `--target` 或 `--global` 时会询问修改项目级还是全局配置；静默模式在未提供时默认修改当前目录。静默模式的结果提示跟随 `--lang`；校验错误来自 Builder，与 `build` 一样可能只有中文。
+
+只编辑按既有优先级选定的配置文件（`config.jsonc` 优先于 `config.json`，同名 Agent 的 `.jsonc` 优先于 `.json`），保留注释和其余配置。写入后由正常 Builder 校验并重建运行时；校验失败恢复原文件并报告错误。修改只对重建后的投影生效——已冻结的 Agent Task 保留其冻结模型链，`o4e_mode=clear` 仍只清除本次运行的模型投影。重启宿主进程后使用重建的运行时。
 
 ## 原生 Agent 策略
 

@@ -21,6 +21,9 @@ node scripts/installer.mjs uninstall --no-tui --target /path/to/project
 node scripts/installer.mjs uninstall --no-tui --global
 node scripts/installer.mjs export my-config.o4e.tar.gz --target /path/to/project
 node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project --force
+node scripts/installer.mjs model --target /path/to/project
+node scripts/installer.mjs model --no-tui --target /path/to/project --default-model=anthropic/claude-sonnet-4-5
+node scripts/installer.mjs model --no-tui --global --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
 ```
 
 ## Subcommands
@@ -33,6 +36,7 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 | `build` | validate `.o4e/` and rebuild the runtime |
 | `export <archive>` | export `.o4e/` as `.o4e.tar.gz` |
 | `import <archive>` | import `.o4e.tar.gz` and rebuild the runtime |
+| `model` | modify the installed model configuration and rebuild the runtime |
 
 ## Options
 
@@ -49,6 +53,10 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 | `--native-policy=<o4e-only\|managed\|keep\|custom>` | choose the overall preset for the four OpenCode native Agents at install time; default `o4e-only` |
 | `--native-build=<keep\|managed\|disable>` etc. | override the individual `build`, `plan`, `general`, or `explore` strategy |
 | `--native-agent <name>=<strategy>` | override a single strategy as a repeatable flag, e.g. `--native-agent build=managed` |
+| `--default-model=<provider/model\|null>` | `model` only; set or clear `config.defaultModel` |
+| `--default-variant=<name\|null>` | `model` only; set or remove the `defaultModel` variant |
+| `--model=<agent>=<provider/model\|null>` | `model` only; set or clear one Agent model; repeatable |
+| `--variant=<agent>=<name\|null>` | `model` only; set or remove one Agent model variant; repeatable |
 | `--help`, `-h` | show help |
 
 ## Arguments
@@ -57,13 +65,30 @@ node scripts/installer.mjs import my-config.o4e.tar.gz --target /path/to/project
 
 Running the CLI without any arguments shows help and exits normally; it does not implicitly start an installation. Every operation requires an explicit subcommand.
 
-`--native-policy`, `--native-*` / `--native-agent`, `--skill`, and `--no-skills` are only for `install`. In a silent install, `custom` must provide a final strategy for all four native Agents; an interactive install separately selects the default main Agent (`all`/`primary`), the child Agent source configuration (`subagent`), default Skills, and the native Agent preset. The default entry is `orchestrator`; optional entries are `orchestrator`, `orchestrator (plan)`, and the read-only pure-chat `chat (plan)`. Chat loads no tools or other roles and cannot delegate or run Workflows; professional roles remain child Agents after expansion, where `architect` is a child Plan and `reviewer`/`researcher` are self Plans. When only self main roles are selected, the installer writes the expanded `(plan)` name into `defaultAgent`.
+`--native-policy`, `--native-*` / `--native-agent`, `--skill`, and `--no-skills` are only for `install`; `--default-model`, `--default-variant`, `--model`, and `--variant` are only for `model`. In a silent install, `custom` must provide a final strategy for all four native Agents; an interactive install separately selects the default main Agent (`all`/`primary`), the child Agent source configuration (`subagent`), default Skills, and the native Agent preset. The default entry is `orchestrator`; optional entries are `orchestrator`, `orchestrator (plan)`, and the read-only pure-chat `chat (plan)`. Chat loads no tools or other roles and cannot delegate or run Workflows; professional roles remain child Agents after expansion, where `architect` is a child Plan and `reviewer`/`researcher` are self Plans. When only self main roles are selected, the installer writes the expanded `(plan)` name into `defaultAgent`.
 
 ## Status, Build, and Uninstall
 
 `build` validates the configuration and the internal managed Skill registry, and generates `.opencode/agents/` and `.opencode/plugins/`; it does not modify `.o4e/` or the public `.opencode/skills/`. Skills are registered by the plugin directly from `.o4e/skills/`. A global `build` does not register plugins; registration only happens on global install or import.
 
 Build only declares O4E's direct runtime dependencies, including Effect and the Bash parsers. It does not install dependencies or supply a default `@opencode-ai/plugin` version; OpenCode prepares the SDK at startup. Existing SDK and Effect declarations in the target `package.json` are preserved, not deleted or overwritten by build. The repository's pinned development SDK is not a version lock for the user's runtime directory. Intranet environments still need the host's package manager to access the required packages; declarations do not mean dependencies are installed or ready for offline use.
+
+## Model Configuration
+
+`model` edits the model fields of an installed `.o4e/` source and rebuilds the runtime, so the generated Agent frontmatter stays consistent without hand-editing JSONC. It supports the global `defaultModel` and the `model` of each concrete `all`/`primary`/`subagent` Agent, each with an optional variant; `null` clears a value and restores inheritance (Agents inherit the global default, and a null global default keeps the host's current selection). `fallbackModels`, system Agents, and Plan Profiles are not editable here — Plans inherit the source Agent model. For the inheritance semantics see the [Configuration Reference](./configuration.md#model-selection-and-run-modes).
+
+Silent mode takes explicit flags and requires at least one of them:
+
+```bash
+node scripts/installer.mjs model --no-tui --target /path/to/project --default-model=anthropic/claude-sonnet-4-5 --default-variant=high
+node scripts/installer.mjs model --no-tui --target /path/to/project --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
+node scripts/installer.mjs model --no-tui --target /path/to/project --model=chat=null
+node scripts/installer.mjs model --no-tui --global --default-model=null
+```
+
+Interactive mode (without `--no-tui`) starts with interface language selection like the installer (`--lang` only pre-selects), shows the current values, and lets you update the default and individual Agents in one pass. The model catalog starts loading in the background as soon as the command is entered (immediately after the scope is known), the same way as the installer, so it is usually ready by the time you pick an entry. When neither `--target` nor `--global` is given, it asks whether to update the project or the global configuration; silent mode updates the current directory unless `--target` or `--global` is provided. Silent success messages follow `--lang`; validation errors come from the builder and may be Chinese-only, as with `build`.
+
+Only the configuration file selected by the normal precedence is edited (`config.jsonc` over `config.json`, and `.jsonc` over `.json` for same-named Agents), preserving comments and all other settings. After writing, the normal builder validates and regenerates the runtime; on validation failure the original files are restored and the error is reported. Changes apply to the rebuilt projection only — already frozen Agent Tasks keep their frozen model chain, and `o4e_mode=clear` still strips the model projection for its run. Restart the host process to pick up the rebuilt runtime.
 
 ## Native Agent Strategies
 

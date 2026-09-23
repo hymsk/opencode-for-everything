@@ -91,6 +91,9 @@ Plan 保留目录许可，默认仍禁止写入和执行。实际编辑、构建
   Builder 写入模型 frontmatter，config hook 保留声明候选，由宿主请求时解析模型；消息不覆盖用户显式选择。
   子 Session 优先冻结目标候选，未配置时继承父模型；候选仅供诊断和显式决策，
   O4E 不会在模型错误后自动重试或自动切换 fallback。`clear` 仅清除本次投影及候选链。
+  安装后可用 `o4e model`（交互）或 `o4e model --no-tui --default-model=...` /
+  `--model=<agent>=...`（静默）修改 `defaultModel` 与 Agent `model`，自动保留注释并重建；
+  直接编辑本目录后运行 `o4e build` 亦可。
 - 项目需要额外规则或契约时，通过 Agent 的
   `instructionFiles.project` 显式加入项目内相对路径。
 

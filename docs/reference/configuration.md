@@ -188,6 +188,8 @@ model library; an empty string is not a compatible alias and fails closed.
 
 The post-installation configuration notes also summarize the [model configuration boundary](../../defaults/.o4e/README.md#配置规则).
 
+To change these values after installation, either edit the `.o4e/` source files above and run `build`, or use the [`model` subcommand](./cli.md#model-configuration), which edits the selected source file with comments preserved and rebuilds the runtime, rolling back on validation failure.
+
 ## Canonical Permission
 
 The current legal values of `loadTools` are:
