@@ -6,6 +6,29 @@ release candidates before a stable baseline.
 
 ## Unreleased
 
+## 0.1.0-rc.2
+
+- Externalized the canonical command recovery ledger: Command records now
+  live in a private per-directory SQLite database under the user data
+  directory (`opencode-for-everything/command-ledgers/<directory-sha256>.sqlite`,
+  `XDG_DATA_HOME`/`~/.local/share` on Linux/macOS or `LOCALAPPDATA` on
+  Windows), while owner Session metadata keeps only a whitelisted version-2
+  display snapshot. Execution, recovery and Workflow evidence read the
+  independent ledger; a failed display publication surfaces
+  `O4E_COMMAND_PROJECTION_UNAVAILABLE` and can be republished without rolling
+  back confirmed records, and unchanged Session updates are skipped to reduce
+  repeated recovery payloads. This updates the `CMD-007` contract: legacy
+  Session recovery layouts are not read, migrated or deleted, so command
+  tasks in flight during the upgrade are not recoverable, and backups or
+  machine moves must include the ledger database alongside the OpenCode
+  database.
+- Normalized `o4e_task` control arguments at the adapter: `cancel` drops
+  optional fields the model fills in for other actions and forwards only
+  `action` plus a single non-empty `taskID` to strict runtime validation, and
+  `inspect`/`follow` optional fields accept explicit `null` to express
+  omission without invented cursors or switch settings. Forbidden inputs such
+  as `reason`, `cursors` and `reread` remain rejected; ownership, host
+  permission and revision checks are unchanged.
 - Changed `o4e_mode` invalid-value handling: an empty string or any other
   unsupported value now falls back to `default` (O4E stays enabled) and emits
   an `O4E_MODE_FALLBACK` error diagnostic naming the invalid value — written
@@ -22,6 +45,9 @@ release candidates before a stable baseline.
   settings, are applied only to the configuration file selected by the normal
   precedence, and trigger a full builder rebuild with rollback to the original
   files on validation failure.
+- Build fixes: generated runtime manifests pin the runtime plugin
+  dependencies and no longer add the development SDK pin, leaving the plugin
+  SDK version to the host while preserving existing SDK declarations.
 
 ## 0.1.0-rc.1
 

@@ -1,6 +1,6 @@
 {
   "name": "@hymsk/o4e",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "A configurable, evolvable agent-plugin system for OpenCode.",
   "license": "AGPL-3.0-or-later",
   "author": {
