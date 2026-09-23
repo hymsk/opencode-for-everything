@@ -1375,7 +1375,11 @@ test("the original Bash abort signal cancels a queued command before a resource 
   await until(() => f.record(queued.taskID).status === "cancelled")
   await f.read(blocker.taskID, "cancel")
   assert.equal(f.active(blocker.taskID), false)
-  assert.equal((await f.bash("printf OK")).status, "completed", "the cancelled queue must remain fenced after a later writer is admitted")
+  const writer = await f.bash("printf OK")
+  // 并行套件负载下 20ms 运行窗口可能先于 printf 完成到期；本断言的契约是
+  // 终态 completed（栅栏未被取消破坏），不是同步返回快照的瞬时相位。
+  if (writer.status !== "completed") await until(() => f.record(writer.taskID).status === "completed")
+  assert.equal(f.record(writer.taskID).status, "completed", "the cancelled queue must remain fenced after a later writer is admitted")
   const final = await f.read(queued.taskID)
   assert.equal(final.status, "cancelled")
   assert.equal(final.phase, "not-submitted")

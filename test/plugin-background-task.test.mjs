@@ -300,7 +300,9 @@ test("default watch monitors Agent and Bash together, deduplicates command state
     ...toolContext(target), messageID: "mixed-command", callID: "mixed-command",
   })
   const commandID = bash.metadata.o4eResult.taskID
-  assert.equal(bash.metadata.o4eResult.status, "running")
+  // 并行套件负载下进程准入可能超过 10ms 排队窗口；queued 是 CMD-006 的合法初返，
+  // 本用例的契约在后续 watch 终态断言，不在同步返回快照的瞬时相位。
+  assert.ok(["queued", "running"].includes(bash.metadata.o4eResult.status), "command must be tracked immediately")
   assert.doesNotMatch(bash.output, /EARLY|LATE/)
   const first = await persistedTaskRead(hooks, client, { action: "watch", timeoutMs: 2000 }, {
     ...toolContext(target), messageID: "mixed-watch", callID: "first",
