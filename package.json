@@ -37,13 +37,16 @@
   "type": "module",
   "exports": {
     "./server": "./src/plugin.ts",
-    "./tui": "./src/tui/index.tsx"
+    "./tui": "./src/tui/index.tsx",
+    "./v2": "./src/plugin-v2.mjs",
+    "./v2/tui": "./src/tui-v2.mjs"
   },
   "bin": {
     "o4e": "scripts/installer.mjs"
   },
   "scripts": {
     "build": "node scripts/installer.mjs build",
+    "build:v2-preview": "node scripts/build-v2-preview.mjs",
     "test": "node test/run.mjs",
     "test:verbose": "node test/run.mjs --verbose",
     "install:interactive": "node scripts/installer.mjs install",
@@ -51,6 +54,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
+    "@opencode/plugin": "2.0.15",
     "jsonc-parser": "3.3.1",
     "tree-sitter-bash": "0.25.0",
     "web-tree-sitter": "0.25.10"

@@ -6,6 +6,118 @@ plugins or installed components and are excluded from both the npm package and
 the default `npm test` command. Fixture tests do not contact model providers or
 launch OpenCode.
 
+## OpenCode V2 preview (read-only)
+
+### Isolated Agent file generator (no V1 install or managed execution)
+
+```bash
+npm run build:v2-preview -- --config-root /absolute/source/.o4e --target /absolute/empty-project
+node test/acceptance/v2-agent-preview.mjs
+node test/acceptance/v2-agent-preview.mjs --package
+```
+
+The explicit generator consumes an already installed/valid `.o4e/` definition
+and creates 13 prefixed V2 Agent Markdown files and a companion guard plugin in a **completely empty**
+target directory; it refuses a symlink, nonempty target or invalid definition.
+It does not replace `o4e build` or write user V1 files; it does register an
+isolated guard plugin. It does not
+translate V1 prompts into claims of managed V2 tools. All generated Agents
+have a final blanket `deny` permission rule and a conspicuous preview prompt.
+The exporter also rejects source/target overlap and uses exclusive `.opencode`
+creation when publishing to avoid replacing a concurrently created empty
+`.opencode` directory. A failed publication may leave `.opencode/plugins`,
+and an interrupted promotion may leave preview Agent files. The guard is
+published before the Agents; it never deletes foreign files as part of rollback.
+An interrupted promotion is not a complete installation: inspect or discard
+the isolated directory.
+The opt-in host acceptance runs the generator against a fresh temporary
+project and a credential-free local fake model on OpenCode 2.0.15, checking
+the selected preview Agent's prompt and zero model-visible tools. The generated
+files do not prove ownership of any globally configured same-name Agent;
+do not move them into a real project without separately checking collisions.
+
+The accompanying plugin checks effective Agent identity, preview marker,
+final blanket deny and model-visible tools; it refuses a modified Agent
+before its model request. Permission checks for preview Sessions are denied.
+It does **not** prove global Agent file ownership, protect an installation
+where another plugin removes/overrides its hooks, or implement V1 managed
+execution. These are opt-in host regression checks:
+
+```bash
+node test/acceptance/v2-agent-preview.mjs --tamper
+node test/acceptance/v2-agent-preview.mjs --collision
+node test/acceptance/v2-agent-preview.mjs --global-collision
+node test/acceptance/v2-agent-preview.mjs --probe
+```
+
+The first alters a generated Agent and requires model-request rejection. The
+second adds a same-name project config definition and checks effective
+zero-tool behavior; `--global-collision` adds a same-name global Agent in
+the fixture XDG config directory. The final case has the fake provider emit
+an unoffered Shell call and requires no Shell side effect. All use isolated
+HOME/XDG projects; a name collision cannot establish source ownership.
+`--package` packs and installs the current source package to a temporary path,
+builds the preview with its unpacked CLI and loads its guard into the real V2
+host; it does not publish or install into an existing user project.
+
+### Native execution feasibility experiment (Linux, separate from preview)
+
+```bash
+node test/acceptance/v2-native.mjs
+```
+
+`v2-native.mjs` generates fresh fixture Agent files outside the repository and
+loads the test-only `v2-native-probe-plugin.mjs` into OpenCode `2.0.15` with
+isolated HOME/XDG directories. A loopback fake provider emits deterministic
+native tool calls. The CLI explicitly selects that provider and a model hook
+rejects other providers. It never registers O4E managed execution or reads user
+credentials. Do not install this probe plugin into a user environment.
+
+The cases compare native and publicly wrapped `shell.execute` for allow,
+resource-specific deny, noninteractive ask rejection, and explicit `--auto`;
+they also check interrupt after a shell starts and native child parentage and
+permission behavior. Only fixture marker files are written. JSON evidence,
+stdout/stderr, and a report are retained in the printed temporary directory.
+Optional positional case names select cases; unknown names fail.
+
+`native-child-bounded-ancestry` loads the standalone public-Session ancestry helper in the isolated probe and verifies a one-parent, bounded Shell decision. Unit coverage in `test/opencode-v2-session-ancestry.test.mjs` rejects missing or mismatched parent identity, cycles, excessive depth and failed reads. This is not parent-policy evaluation or a production permission hook.
+
+The child-permission case **expects a non-equivalence**: a native child with
+its own allow can run a command denied to its parent. Passing this experiment
+does not establish O4E authority inheritance. `--auto` is test-only explicit
+host auto-approval, not manual user approval. Human approval/rejection UI,
+approval cancellation, Agent ownership conflicts, builder integration,
+delegation depth, background lifetime/restart, and completed original Part
+updates are not validated by these cases. Cancellation covers a simple shell
+process, not all descendant/process-management scenarios.
+
+The separate `@hymsk/o4e/v2/tui` export provides a CLI-only, read-only
+`o4e-v2-status` slash/palette command. It reads the local selected O4E
+configuration only when invoked and reports that managed execution is
+unavailable. To test in an isolated V2 CLI, configure a CLI plugin directory
+whose `index.mjs` re-exports this entry and list that directory in the
+isolated `<XDG_CONFIG_HOME>/opencode/cli.json` `plugins` array. Do not list it as a server plugin or
+overwrite the V1 `./tui` export. Neither this command nor the acceptance
+below validates V2 managed execution, Agent Task UI, or server health.
+
+`v2-preview.mjs` is a separate opt-in acceptance harness for OpenCode `2.0.15`.
+It packs and installs the current npm artifact in a temporary project, resolves
+the real `@hymsk/o4e/v2` export through a directory plugin, and uses an isolated
+HOME/XDG environment and local, credential-free fake model. It checks that the
+read-only `o4e_v2_status` tool returns a model-visible result and reports the
+synthetic configured MCP server as **unprojected**. It does not install into a
+user project, register MCP or managed execution, use real model credentials,
+or establish V2 TUI / Agent Task support. Its temporary fixture path is printed
+on success or failure; it is not a sanitized public report.
+
+```bash
+node test/acceptance/v2-preview.mjs
+```
+
+Set `OPENCODE_V2_BIN` to a trusted `2.0.15` binary path if `opencode2` is not
+on `PATH`. npm installs the current artifact's dependencies into the temporary
+project; the project under test and the isolated host never use live credentials.
+
 The separate [process-v1 host checklist](workflow-process.md) describes the
 still-unverified Workflow multi-turn, compaction, restart, evidence and UI
 scenarios. None of the Task inspect or Bash cwd harnesses below validates them.
@@ -167,3 +279,6 @@ When operating through Zellij, use Zellij MCP for terminal lifecycle operations.
 - Moving or testing the harness does not establish a new controlled/live PASS.
   Revalidate the exact source, host, dependency artifact and configuration for
   each explicit run. This scenario does not validate global Bash takeover.
+# V2 native ancestry contrast (not production permission inheritance)
+
+`node test/acceptance/v2-native.mjs native-child-permissions native-child-parent-hook native-child-parent-hook-failure` runs isolated OpenCode 2.0.15 with a credential-free local model. The first case observes a native child exceeding its parent's Shell deny; the second uses public `session.get` ancestry and `permission.hook("evaluate")` to turn the child's allow into a deny before side effects. The third forces a failed public Session lookup during evaluation and requires no Shell side effect. A child may still return a `completed` label after that error. These three cases do not establish full policy inheritance, ancestor traversal, ask flows, other tools or lifecycle recovery. See `SPEC.md` `V2-NAT-003` for the independent V2 acceptance target.

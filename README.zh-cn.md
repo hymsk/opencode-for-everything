@@ -19,6 +19,16 @@ O4E 不会为子 Agent 赋予额外权限，不自动重试失败的模型，也
 
 ## 安装
 
+### OpenCode V2 预览（与上述 V1 安装不同）
+
+当前源码的 V2 能力仅限显式启用的只读状态工具/TUI 命令，以及**空白隔离项目**中的全工具拒绝 Agent 预览；不是 V1 安装或受管委派的替代。先准备独立的 `HOME` 和全部 `XDG_*` 目录（不加载现有全局配置/插件），确认目标项目完全空白且未使用真实凭据。已有有效 `.o4e/` 配置时，可从本仓库构建预览：
+
+```bash
+npm run build:v2-preview -- --config-root /absolute/source/.o4e --target /absolute/empty-project
+```
+
+生成物含 `.opencode/agents/` 和隔离预览守卫插件；守卫在模型请求前检查有效预览 Agent，并拒绝该 Agent 自身 Session 的权限请求。请仅用上述隔离的 `HOME`/`XDG_*` 启动 OpenCode 2.0.15，不要将生成文件移入已有项目或全局目录；全局同名来源归属、其他插件交互和生产安装尚未验收。V2 `bash`、`task`、`o4e_task`、Workflow、后台恢复均不可用。这里只描述当前源码，**不代表已发布 npm 版本含有这些 V2 改动**。
+
 环境要求：Node.js 20.12+、npm，以及已加入 `PATH` 的 `opencode`。OpenCode 验证基线为 `>=1.18.21`，不表示后续每个版本均已逐一验证。
 
 ```bash

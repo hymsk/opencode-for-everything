@@ -58,9 +58,17 @@ test("npm 包包含 @hymsk/o4e 安装所需文件", () => {
     const published = join(packageRoot, "package")
     for (const path of [
       "scripts/installer.mjs",
+      "scripts/build-v2-preview.mjs",
       "scripts/native-prompt-sync.mjs",
       "scripts/global-plugin-registry.mjs",
       "src/runtime-builder.mjs",
+      "src/plugin-v2.mjs",
+      "src/tui-v2.mjs",
+      "src/adapters/opencode-v2/tui-status.mjs",
+      "src/adapters/opencode-v2/compat.mjs",
+      "src/adapters/opencode-v2/agent-preview-builder.mjs",
+      "src/adapters/opencode-v2/preview-guard.mjs",
+      "src/adapters/opencode-v2/session-ancestry.mjs",
       "defaults/.o4e/config.jsonc",
     ]) {
       assert.equal(existsSync(join(published, path)), true, `${path} must be published`)
@@ -71,6 +79,9 @@ test("npm 包包含 @hymsk/o4e 安装所需文件", () => {
 
     const manifest = JSON.parse(readFileSync(join(published, "package.json"), "utf8"))
     assert.equal(manifest.name, "@hymsk/o4e")
+    assert.equal(manifest.exports["./v2"], "./src/plugin-v2.mjs")
+    assert.equal(manifest.exports["./v2/tui"], "./src/tui-v2.mjs")
+    assert.equal(manifest.dependencies["@opencode/plugin"], "2.0.15")
     assert.equal(manifest.bin?.o4e, "scripts/installer.mjs")
     const bin = join(published, manifest.bin.o4e)
     assert.equal(existsSync(bin), true)
@@ -90,6 +101,18 @@ test("npm 包包含 @hymsk/o4e 安装所需文件", () => {
     })
     assert.equal(existsSync(join(target, ".o4e", "config.jsonc")), true)
     assert.equal(existsSync(join(target, ".opencode", "plugins", "opencode-for-everything.ts")), true)
+
+    const preview = join(packageRoot, "v2-isolated-preview")
+    mkdirSync(preview)
+    execFileSync(process.execPath, [join(published, "scripts", "build-v2-preview.mjs"),
+      "--config-root", join(target, ".o4e"), "--target", preview], {
+      cwd: componentRoot, stdio: "pipe", timeout: 60_000, env: installerTestEnv(),
+    })
+    const guard = join(preview, ".opencode", "plugins", "o4e-v2-preview-guard", "index.mjs")
+    assert.equal(existsSync(guard), true, "unpacked package must install the V2 preview guard")
+    assert.equal(existsSync(join(preview, ".opencode", "agents", "o4e-v2-preview-plan-chat.md")), true)
+    assert.equal(existsSync(join(target, ".opencode", "plugins", "opencode-for-everything.ts")), true,
+      "running V2 preview build must not replace V1 output")
 
     const archive = join(packageRoot, "config.o4e.tar.gz")
     execFileSync(process.execPath, [bin, "export", archive, "--target", target], {

@@ -19,6 +19,16 @@ O4E does not grant sub-agents extra permissions, retry failed models on its own,
 
 ## Install
 
+### OpenCode V2 preview (separate from the V1 install below)
+
+The current source offers only opt-in read-only status tooling and deny-all Agent previews in an **empty isolated project** on V2; this is not a replacement for V1 installation or managed delegation. Prepare independent `HOME` and all `XDG_*` directories first (without existing global configuration/plugins), use no real credentials, and confirm the target project is completely empty. Given an existing valid `.o4e/` configuration, build the preview from this repository:
+
+```bash
+npm run build:v2-preview -- --config-root /absolute/source/.o4e --target /absolute/empty-project
+```
+
+The output includes `.opencode/agents/` and an isolated preview guard plugin that checks the effective preview Agent before model requests and denies permission checks belonging to its own Session. Run OpenCode 2.0.15 only with the isolated `HOME`/`XDG_*` above; do not move these files into an existing project or global configuration: global same-name ownership, interaction with other plugins and production installation are not validated. V2 `bash`, `task`, `o4e_task`, Workflow and background recovery are unavailable. This describes current source only; **it does not claim the published npm version contains these V2 changes**.
+
 Requirements: Node.js 20.12+, npm, and `opencode` on `PATH`. The OpenCode validation baseline is `>=1.18.21`, not a claim that every later version has been individually validated.
 
 ```bash
