@@ -6,6 +6,11 @@ release candidates before a stable baseline.
 
 ## Unreleased
 
+- Added a `--version` (`-v`) installer option that prints the package version
+  and exits successfully. It works alone or together with any subcommand,
+  covers automated version reporting for `npx @hymsk/o4e` and `o4e` entries,
+  and the printed value is the published package version.
+
 ## 0.1.0-rc.2
 
 - Externalized the canonical command recovery ledger: Command records now

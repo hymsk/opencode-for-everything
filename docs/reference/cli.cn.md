@@ -57,6 +57,7 @@ node scripts/installer.mjs model --no-tui --global --model=orchestrator=openai/g
 | `--default-variant=<name\|null>` | `model` 专用；设置或移除 `defaultModel` 的 variant |
 | `--model=<agent>=<provider/model\|null>` | `model` 专用；设置或清除单个 Agent 模型，可重复使用 |
 | `--variant=<agent>=<name\|null>` | `model` 专用；设置或移除单个 Agent 模型的 variant，可重复使用 |
+| `--version`, `-v` | 输出安装器版本并退出 |
 | `--help`, `-h` | 显示帮助 |
 
 ## 参数说明

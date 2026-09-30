@@ -1089,6 +1089,22 @@ test("帮助信息", () => {
   assert.match(result.output, /installer\.mjs <command> \[argument\] \[options\]/)
   assert.doesNotMatch(result.output, /^\s+--(?:status|uninstall|build|export|import)\b/m)
   assert.doesNotMatch(result.output, /\[install\]/)
+  assert.match(result.output, /--version, -v/)
+})
+
+test("版本输出与包版本一致", () => {
+  const manifest = JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"))
+  for (const argument of ["--version", "-v"]) {
+    const result = runInstaller([argument])
+    assert.equal(result.success, true)
+    assert.equal(result.output.trim(), manifest.version)
+  }
+  for (const argument of ["install --version", "status --global --version"]) {
+    const [command, ...rest] = argument.split(" ")
+    const result = runInstaller([command, ...rest])
+    assert.equal(result.success, true, `${argument}: ${result.output}`)
+    assert.equal(result.output.trim(), manifest.version)
+  }
 })
 
 test("导入导出子命令拒绝空文件路径", () => {
