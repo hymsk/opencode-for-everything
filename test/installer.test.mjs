@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import { stripJsonComments } from "../src/jsonc.mjs"
 import { loadRuntimeDefinition } from "../src/runtime-builder.mjs"
 import { WorkflowRuntime } from "../src/runtime/workflow-runtime.mjs"
-import { createModelCatalogLoader, loadAvailableModels, materializeModelConfig, parseOpenCodeModels, defaultAgentSelectionGroups, defaultSkillNames, generateSilentConfig, isSafeArchiveEntryPath, nativePolicyStrategies, resolveNativeInstallOptions, resolveSkillSelection, shouldConfigureNativeAgents, tarOutputLines } from "../scripts/installer.mjs"
+import { createModelCatalogLoader, loadAvailableModels, materializeModelConfig, parseOpenCodeModels, defaultAgentSelectionGroups, defaultSkillNames, generateSilentConfig, installerInvocationForm, isSafeArchiveEntryPath, nativePolicyStrategies, resolveNativeInstallOptions, resolveSkillSelection, shouldConfigureNativeAgents, tarOutputLines } from "../scripts/installer.mjs"
 import { copyInstalledDefaults } from "./helpers/o4e-fixture.mjs"
 import { createDanglingDirectoryLink, createDirectoryLink, createFileLink, removeLink } from "./helpers/fs-link-fixture.mjs"
 import { installerTestEnv } from "./helpers/installer-cli-fixture.mjs"
@@ -1090,6 +1090,27 @@ test("帮助信息", () => {
   assert.doesNotMatch(result.output, /^\s+--(?:status|uninstall|build|export|import)\b/m)
   assert.doesNotMatch(result.output, /\[install\]/)
   assert.match(result.output, /--version, -v/)
+})
+
+test("帮助信息跟随调用形态", () => {
+  const sourceScript = pathToFileURL(join(import.meta.dirname, "..", "scripts", "installer.mjs")).href
+  assert.equal(installerInvocationForm({}, sourceScript), "node scripts/installer.mjs")
+  assert.equal(installerInvocationForm({ npm_command: "exec" }, sourceScript), "npx @hymsk/o4e")
+  assert.equal(installerInvocationForm({ npm_command: "run-script" }, sourceScript), "node scripts/installer.mjs")
+  const packageRoot = mkdtempSync(join(tmpdir(), "o4e-invocation-"))
+  try {
+    const packageScript = join(packageRoot, "node_modules", "@hymsk", "o4e", "scripts", "installer.mjs")
+    mkdirSync(dirname(packageScript), { recursive: true })
+    writeFileSync(packageScript, "")
+    const packagedHref = pathToFileURL(packageScript).href
+    assert.equal(installerInvocationForm({}, packagedHref), "o4e")
+    assert.equal(installerInvocationForm({ npm_command: "exec" }, packagedHref), "npx @hymsk/o4e")
+  } finally {
+    rmSync(packageRoot, { recursive: true, force: true })
+  }
+  const help = runInstaller(["--help"])
+  assert.match(help.output, /node scripts\/installer\.mjs <command> \[argument\] \[options\]/)
+  assert.match(help.output, /node scripts\/installer\.mjs install --no-tui /)
 })
 
 test("版本输出与包版本一致", () => {

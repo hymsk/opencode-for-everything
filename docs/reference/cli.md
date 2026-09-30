@@ -9,7 +9,7 @@
 - **Source script**: `node scripts/installer.mjs` (used for development and debugging)
 - **Package command**: `o4e` (provided by an npm global install or link; arguments are exactly the same as the source script)
 
-For one-off use, run `npx @hymsk/o4e <subcommand>`. The examples below use the source script form; you can replace `node scripts/installer.mjs` with `npx @hymsk/o4e` or `o4e`. The installer's `install --global` only selects the OpenCode global configuration scope and does not install the command globally.
+For one-off use, run `npx @hymsk/o4e <subcommand>`. The examples below use the source script form; you can replace `node scripts/installer.mjs` with `npx @hymsk/o4e` or `o4e`. The `--help` output mirrors the entry actually used: `npx @hymsk/o4e ...` under npx or npm exec, `o4e ...` for the npm-installed package command, and `node scripts/installer.mjs ...` for the source script. The installer's `install --global` only selects the OpenCode global configuration scope and does not install the command globally.
 
 ```bash
 node scripts/installer.mjs install

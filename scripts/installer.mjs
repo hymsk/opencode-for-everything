@@ -431,12 +431,26 @@ if (IS_MAIN && command === "install") {
   }
 }
 
+export function installerInvocationForm(env = process.env, scriptUrl = import.meta.url) {
+  // npx and npm exec inject npm_command=exec when launching the package bin.
+  if (env.npm_command === "exec") return "npx @hymsk/o4e"
+  try {
+    // npm-installed package scripts resolve to a path under node_modules;
+    // their command name is the package bin (o4e).
+    if (realpathSync(fileURLToPath(scriptUrl)).split(/[\\/]/).includes("node_modules")) return "o4e"
+  } catch {
+    // Unreadable script path: fall through to the source script form.
+  }
+  return "node scripts/installer.mjs"
+}
+
 function printUsage() {
+  const invocation = installerInvocationForm()
   console.log(`
 opencode-for-everything installer
 
 Usage:
-   node scripts/installer.mjs <command> [argument] [options]
+   ${invocation} <command> [argument] [options]
 
 Commands:
   install            Install and build the runtime
@@ -479,25 +493,25 @@ Options:
   --help, -h        Show this help
 
 Examples:
-   node scripts/installer.mjs install                   # Interactive install
-   node scripts/installer.mjs install --no-tui          # Silent install (default configuration)
-   node scripts/installer.mjs install --no-tui --no-soul --lang=en # Silent install in English without SOUL
-   node scripts/installer.mjs install --no-tui --native-policy=managed
-   node scripts/installer.mjs install --no-tui --native-policy=custom --native-build=managed --native-plan=keep --native-general=disable --native-explore=disable
-   node scripts/installer.mjs install --no-tui --native-agent build=managed --native-agent plan=keep --native-agent general=disable --native-agent explore=disable
-   node scripts/installer.mjs install --target=./my-project # Install to a specific directory
-   node scripts/installer.mjs build --target=./my-project
-   node scripts/installer.mjs uninstall                 # Uninstall from the current directory
-   node scripts/installer.mjs uninstall --global        # Uninstall the global installation
-   node scripts/installer.mjs status --target=./my-project
-   node scripts/installer.mjs status --global
-   node scripts/installer.mjs export backup.o4e.tar.gz --target=./my-project
-   node scripts/installer.mjs import backup.o4e.tar.gz --target=./my-project --force
-   node scripts/installer.mjs model                             # Interactive model configuration
-   node scripts/installer.mjs model --global                    # Interactive model configuration (global)
-   node scripts/installer.mjs model --no-tui --target=./my-project --default-model=anthropic/claude-sonnet-4-5
-   node scripts/installer.mjs model --no-tui --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
-   node scripts/installer.mjs model --no-tui --model=chat=null  # Clear one Agent model (inherit)
+   ${invocation} install                   # Interactive install
+   ${invocation} install --no-tui          # Silent install (default configuration)
+   ${invocation} install --no-tui --no-soul --lang=en # Silent install in English without SOUL
+   ${invocation} install --no-tui --native-policy=managed
+   ${invocation} install --no-tui --native-policy=custom --native-build=managed --native-plan=keep --native-general=disable --native-explore=disable
+   ${invocation} install --no-tui --native-agent build=managed --native-agent plan=keep --native-agent general=disable --native-agent explore=disable
+   ${invocation} install --target=./my-project # Install to a specific directory
+   ${invocation} build --target=./my-project
+   ${invocation} uninstall                 # Uninstall from the current directory
+   ${invocation} uninstall --global        # Uninstall the global installation
+   ${invocation} status --target=./my-project
+   ${invocation} status --global
+   ${invocation} export backup.o4e.tar.gz --target=./my-project
+   ${invocation} import backup.o4e.tar.gz --target=./my-project --force
+   ${invocation} model                             # Interactive model configuration
+   ${invocation} model --global                    # Interactive model configuration (global)
+   ${invocation} model --no-tui --target=./my-project --default-model=anthropic/claude-sonnet-4-5
+   ${invocation} model --no-tui --model=orchestrator=openai/gpt-5.2 --variant=orchestrator=high
+   ${invocation} model --no-tui --model=chat=null  # Clear one Agent model (inherit)
 `)
 }
 
