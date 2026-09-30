@@ -6,6 +6,10 @@ release candidates before a stable baseline.
 
 ## Unreleased
 
+- The installer `--help` output now mirrors the entry actually used: it shows
+  `npx @hymsk/o4e` usage and examples under npx or npm exec, `o4e` for the
+  npm-installed package command, and `node scripts/installer.mjs` for the
+  source script. All options and commands are unchanged.
 - Added a `--version` (`-v`) installer option that prints the package version
   and exits successfully. It works alone or together with any subcommand,
   covers automated version reporting for `npx @hymsk/o4e` and `o4e` entries,

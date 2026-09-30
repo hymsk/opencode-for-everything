@@ -9,7 +9,7 @@
 - **源码脚本**：`node scripts/installer.mjs`（开发和调试时使用）
 - **包命令**：`o4e`（通过 npm 全局安装或 link 提供，参数与源码脚本完全一致）
 
-一次性使用时运行 `npx @hymsk/o4e <subcommand>`。以下示例采用源码脚本格式，可将 `node scripts/installer.mjs` 替换为 `npx @hymsk/o4e` 或 `o4e`。安装器的 `install --global` 仅选择 OpenCode 全局配置范围，不会把命令全局安装到 npm 环境。
+一次性使用时运行 `npx @hymsk/o4e <subcommand>`。以下示例采用源码脚本格式，可将 `node scripts/installer.mjs` 替换为 `npx @hymsk/o4e` 或 `o4e`。`--help` 输出会跟随实际使用的入口：npx 或 npm exec 下显示 `npx @hymsk/o4e ...`，npm 安装的包命令显示 `o4e ...`，源码脚本显示 `node scripts/installer.mjs ...`。安装器的 `install --global` 仅选择 OpenCode 全局配置范围，不会把命令全局安装到 npm 环境。
 
 ```bash
 node scripts/installer.mjs install
