@@ -16,6 +16,7 @@
  *   node scripts/installer.mjs export backup.o4e.tar.gz --target /path/to/project
  *   node scripts/installer.mjs import backup.o4e.tar.gz --target /path/to/project --force
  *   node scripts/installer.mjs model --no-tui --target /path/to/project --default-model=provider/model
+ *   node scripts/installer.mjs --version               # Print installer version
  */
 
 import { parseArgs, promisify } from "node:util"
@@ -37,6 +38,7 @@ import { applyModelChanges, formatModelValue, modelConfigRoot, parseModelCliOpti
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const execFileAsync = promisify(execFile)
 const COMPONENT = "opencode-for-everything"
+const INSTALLER_VERSION = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")).version
 const RUNTIME_PLUGIN_FILES = [
   "opencode-for-everything.ts",
 ]
@@ -309,6 +311,7 @@ const DEFAULT_ARGS = {
   "default-variant": undefined,
   model: undefined,
   variant: undefined,
+  version: false,
   help: false,
 }
 let args = DEFAULT_ARGS
@@ -336,6 +339,7 @@ if (IS_MAIN) {
         "default-variant": { type: "string" },
         "model": { type: "string", multiple: true },
         "variant": { type: "string", multiple: true },
+        "version": { type: "boolean", short: "v", default: false },
         "help": { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -367,6 +371,10 @@ if (IS_MAIN) {
   }
 }
 
+if (IS_MAIN && args.version) {
+  console.log(INSTALLER_VERSION)
+  process.exit(0)
+}
 if (IS_MAIN && args.help) {
   printUsage()
   process.exit(0)
@@ -467,6 +475,7 @@ Options:
                     model subcommand: set or clear one Agent model; repeatable
   --variant=<agent>=<name|null>
                     model subcommand: set or remove one Agent model variant; repeatable
+  --version, -v     Print the installer version and exit
   --help, -h        Show this help
 
 Examples:

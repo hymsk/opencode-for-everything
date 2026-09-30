@@ -57,6 +57,7 @@ node scripts/installer.mjs model --no-tui --global --model=orchestrator=openai/g
 | `--default-variant=<name\|null>` | `model` only; set or remove the `defaultModel` variant |
 | `--model=<agent>=<provider/model\|null>` | `model` only; set or clear one Agent model; repeatable |
 | `--variant=<agent>=<name\|null>` | `model` only; set or remove one Agent model variant; repeatable |
+| `--version`, `-v` | print the installer version and exit |
 | `--help`, `-h` | show help |
 
 ## Arguments
